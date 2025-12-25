@@ -97,5 +97,3 @@ function defineFromEnv($constantName, $envKey, $default = null) {
         define($constantName, env($envKey, $default));
     }
 }
-
-EOF
