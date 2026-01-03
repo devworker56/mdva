@@ -280,16 +280,49 @@ const pusher = new Pusher('fe6f264f2fba2f7bc4a2', {
     encrypted: true
 });
 
-// Subscribe to charity channel
+// Subscribe to charity channel - FIXED: Using proper channel name format
 const channel = pusher.subscribe('charity_<?php echo $charity_id; ?>');
 
-// Listen for new donations
+// Debug: Log subscription status
+console.log('Subscribing to channel:', 'charity_<?php echo $charity_id; ?>');
+console.log('Channel subscription status:', channel.subscribed);
+
+// Listen for connection events
+pusher.connection.bind('connected', function() {
+    console.log('Pusher connected successfully');
+    console.log('Socket ID:', pusher.connection.socket_id);
+});
+
+pusher.connection.bind('error', function(err) {
+    console.error('Pusher connection error:', err);
+});
+
+// Listen for subscription events
+channel.bind('pusher:subscription_succeeded', function() {
+    console.log('Successfully subscribed to charity channel: charity_<?php echo $charity_id; ?>');
+    document.getElementById('realtime-status').textContent = 'Connecté aux mises à jour en temps réel';
+    document.getElementById('realtime-status').style.color = '#198754';
+});
+
+channel.bind('pusher:subscription_error', function(err) {
+    console.error('Subscription error:', err);
+    document.getElementById('realtime-status').textContent = 'Erreur de connexion - veuillez rafraîchir la page';
+    document.getElementById('realtime-status').style.color = '#dc3545';
+});
+
+// Listen for the correct event name: 'new_donation' (matches donations.php)
 channel.bind('new_donation', function(data) {
-    console.log('Nouveau don reçu:', data);
+    console.log('Nouveau don reçu sur le tableau de bord:', data);
+    
+    // Verify this is for the correct charity
+    if (data.charity_id != <?php echo $charity_id; ?>) {
+        console.log('Donation is for different charity:', data.charity_id, 'expected:', <?php echo $charity_id; ?>);
+        return;
+    }
     
     // Update total donations amount
     const totalElement = document.getElementById('total-donations');
-    const currentTotal = parseFloat(totalElement.textContent.replace('$', '').replace(',', ''));
+    const currentTotal = parseFloat(totalElement.textContent.replace('$', '').replace(',', '').replace(' ', ''));
     const newTotal = (currentTotal + parseFloat(data.amount)).toFixed(2);
     totalElement.textContent = newTotal + ' $';
     
@@ -300,7 +333,7 @@ channel.bind('new_donation', function(data) {
     
     // Update today's total
     const todayElement = document.getElementById('today-total');
-    const todayTotal = parseFloat(todayElement.textContent.replace('$', '').replace(',', ''));
+    const todayTotal = parseFloat(todayElement.textContent.replace('$', '').replace(',', '').replace(' ', ''));
     const newTodayTotal = (todayTotal + parseFloat(data.amount)).toFixed(2);
     todayElement.textContent = newTodayTotal + ' $';
     
@@ -319,11 +352,14 @@ channel.bind('new_donation', function(data) {
 function addDonationToTable(data) {
     const tableBody = document.getElementById('donations-table');
     
-    // Format location
+    // Format location - use module_id as location if location not provided
     const location = data.location || data.module_id || 'Station inconnue';
     
     // Format session ID
     const sessionId = data.session_id ? data.session_id.substring(0, 8) + '...' : 'N/A';
+    
+    // Format timestamp
+    const timestamp = data.timestamp ? new Date(data.timestamp) : new Date();
     
     // Create new row
     const newRow = document.createElement('tr');
@@ -332,9 +368,9 @@ function addDonationToTable(data) {
         <td>${data.donor_id || 'Inconnu'}</td>
         <td>$${parseFloat(data.amount).toFixed(2)}</td>
         <td>${data.coin_count || 0}</td>
-        <td>${location}</td>
+        <td>${data.charity_name || 'N/A'}</td>
         <td><small class="text-muted">${sessionId}</small></td>
-        <td>${new Date().toLocaleDateString('fr-CA', { 
+        <td>${timestamp.toLocaleDateString('fr-CA', { 
             day: 'numeric', 
             month: 'short', 
             year: 'numeric',
@@ -364,29 +400,31 @@ function addDonationToTable(data) {
 // Function to show toast notification
 function showToastNotification(data) {
     // Create toast element
-    const toast = document.createElement('div');
-    toast.className = 'position-fixed bottom-0 end-0 p-3';
-    toast.style.zIndex = '1050';
+    const toastContainer = document.createElement('div');
+    toastContainer.className = 'position-fixed bottom-0 end-0 p-3';
+    toastContainer.style.zIndex = '1050';
     
-    toast.innerHTML = `
+    toastContainer.innerHTML = `
         <div class="toast show" role="alert" aria-live="assertive" aria-atomic="true">
             <div class="toast-header bg-success text-white">
                 <strong class="me-auto">🎉 Nouveau don reçu!</strong>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+                <button type="button" class="btn-close btn-close-white" onclick="this.parentElement.parentElement.parentElement.remove()"></button>
             </div>
             <div class="toast-body">
                 <strong>$${parseFloat(data.amount).toFixed(2)}</strong> de ${data.donor_id || 'Donateur'}<br>
-                <small>${data.location || ''}</small>
+                <small>${data.charity_name || 'Organisme'}</small>
                 ${data.coin_count ? `<br><small>${data.coin_count} pièces</small>` : ''}
             </div>
         </div>
     `;
     
-    document.body.appendChild(toast);
+    document.body.appendChild(toastContainer);
     
     // Remove toast after 5 seconds
     setTimeout(() => {
-        toast.remove();
+        if (toastContainer.parentNode) {
+            toastContainer.remove();
+        }
     }, 5000);
 }
 
@@ -399,6 +437,19 @@ function refreshDonations() {
                 updateDonationsTable(data.donations);
                 // Hide notification badge
                 document.getElementById('new-donations-badge').style.display = 'none';
+                
+                // Update stats from API
+                fetch(`../api/donations.php?action=stats&donor_id=<?php echo $charity_id; ?>`)
+                    .then(response => response.json())
+                    .then(statsData => {
+                        if(statsData.success) {
+                            const stats = statsData.stats;
+                            document.getElementById('total-donations').textContent = 
+                                (stats.total_donated ? parseFloat(stats.total_donated).toFixed(2) : '0.00') + ' $';
+                            document.getElementById('donation-count').textContent = 
+                                stats.donation_count || 0;
+                        }
+                    });
             }
         })
         .catch(error => console.error('Erreur de rafraîchissement:', error));
@@ -414,7 +465,7 @@ function updateDonationsTable(donations) {
             <td>${donation.donor_id || 'Inconnu'}</td>
             <td>$${parseFloat(donation.amount).toFixed(2)}</td>
             <td>${donation.coin_count || 0}</td>
-            <td>${donation.location_name ? `${donation.location_name}, ${donation.city}` : donation.module_name}</td>
+            <td>${donation.charity_name || 'N/A'}</td>
             <td><small class="text-muted">${donation.session_id ? donation.session_id.substring(0, 8) + '...' : 'N/A'}</small></td>
             <td>${new Date(donation.created_at).toLocaleDateString('fr-CA', { 
                 day: 'numeric', 
@@ -431,11 +482,23 @@ function updateDonationsTable(donations) {
 // Connection status
 pusher.connection.bind('connected', () => {
     document.getElementById('realtime-status').textContent = 'Connecté aux mises à jour en temps réel';
+    document.getElementById('realtime-status').style.color = '#198754';
 });
 
 pusher.connection.bind('disconnected', () => {
     document.getElementById('realtime-status').textContent = 'Déconnecté - reconnection en cours...';
+    document.getElementById('realtime-status').style.color = '#ffc107';
 });
+
+pusher.connection.bind('failed', () => {
+    document.getElementById('realtime-status').textContent = 'Connexion échouée';
+    document.getElementById('realtime-status').style.color = '#dc3545';
+});
+
+// Test Pusher connection on load
+console.log('Initializing Pusher for charity dashboard');
+console.log('Charity ID:', <?php echo $charity_id; ?>);
+console.log('Charity Name:', '<?php echo $charity['name'] ?? ''; ?>');
 </script>
 
 <style>
@@ -451,6 +514,11 @@ pusher.connection.bind('disconnected', () => {
 
 .toast {
     min-width: 300px;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+#realtime-status {
+    font-weight: 500;
 }
 </style>
 

@@ -164,6 +164,7 @@ function recordDonation($db, $data) {
         $updated_session = $session_stmt->fetch(PDO::FETCH_ASSOC);
         
         // Notifier via Pusher pour les mises à jour en temps réel
+        // 1. Notifier l'utilisateur donateur
         notify_pusher('donation_received', [
             'donation_id' => $donation_id,
             'donor_id' => $donor_id,
@@ -176,6 +177,20 @@ function recordDonation($db, $data) {
             'session_total' => $updated_session['total_amount'],
             'timestamp' => date('Y-m-d H:i:s')
         ], "user_" . $session['donor_user_id']);
+        
+        // 2. Notifier le tableau de bord de l'organisme
+        notify_pusher('new_donation', [
+            'donation_id' => $donation_id,
+            'donor_id' => $session['donor_user_id'], // Use donor_user_id, not internal ID
+            'charity_id' => $charity_id,
+            'charity_name' => $session['charity_name'],
+            'amount' => $amount,
+            'coin_count' => $coin_count,
+            'session_id' => $session_id,
+            'module_id' => $module_id,
+            'location' => $module_id, // You might want to get actual location
+            'timestamp' => date('Y-m-d H:i:s')
+        ], "charity_" . $charity_id);
         
         $response = [
             'success' => true, 
@@ -351,9 +366,6 @@ function getSessionDonations($db, $data) {
         echo json_encode(['success' => false, 'message' => 'Échec du chargement des dons de session : ' . $e->getMessage()]);
     }
 }
-
-// ... (conserver les autres fonctions existantes comme getTaxReceipts, getCharityDonations, getRecentDonations inchangées)
-// Ces fonctions ne nécessitent pas de modifications pour la sélection d'organisme par session
 
 /**
  * Obtenir les données de reçu fiscal pour un donateur
