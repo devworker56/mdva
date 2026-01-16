@@ -281,7 +281,7 @@ function generateModuleQRData($module_id, $module_name = '', $location = '') {
         'type' => 'donation_module',
         'version' => '1.0',
         'timestamp' => time(),
-        'url' => "https://tech-ideapad.com/donate.php?module=" . urlencode($module_id)
+        'url' => "https://systeme-mdva.com/module/" . urlencode($module_id)
     ];
     
     return json_encode($qr_data);
@@ -291,7 +291,10 @@ function generateModuleQRData($module_id, $module_name = '', $location = '') {
  * Générer un code QR unique pour un module
  */
 function generateModuleQRCode($module_id, $module_name = '', $location = '', $save_path = null) {
-    require_once 'Lib/phpqrcode/qrlib.php';
+    // CORRECTED PATH: Use the installed QR code library
+    // The library is installed at: public_html/qrlib/phpqrcode/qrlib.php
+    // Since this function is called from files in public_html, use relative path
+    require_once 'qrlib/phpqrcode/qrlib.php';
     
     $qr_data = generateModuleQRData($module_id, $module_name, $location);
     
@@ -314,7 +317,8 @@ function generateModuleQRCode($module_id, $module_name = '', $location = '', $sa
  * Générer plusieurs codes QR pour tous les modules
  */
 function generateAllModuleQRCodes($db) {
-    require_once 'Lib/phpqrcode/qrlib.php';
+    // CORRECTED PATH: Use the installed QR code library
+    require_once 'qrlib/phpqrcode/qrlib.php';
     
     $qr_dir = "../qr_codes/";
     if (!file_exists($qr_dir)) {
@@ -659,4 +663,48 @@ function generate_tax_receipt_data_simple($donor_id, $year, $db) {
     ];
 }
 
+// =============================================================================
+// FONCTIONS AJOUTÉES POUR LA GÉNÉRATION DE CODES QR
+// =============================================================================
+
+/**
+ * Fonction pour générer un QR code simple (utilisée par generate_barcode.php)
+ */
+function generateSimpleQRCode($data, $filename = null) {
+    // Inclure la bibliothèque QR Code
+    require_once 'qrlib/phpqrcode/qrlib.php';
+    
+    if ($filename === null) {
+        // Créer un fichier temporaire
+        $temp_dir = "../temp_qr_codes/";
+        if (!file_exists($temp_dir)) {
+            mkdir($temp_dir, 0755, true);
+        }
+        $filename = $temp_dir . 'qr_' . md5($data . time()) . '.png';
+    }
+    
+    // Générer le QR code
+    QRcode::png($data, $filename, QR_ECLEVEL_L, 10, 2);
+    
+    return $filename;
+}
+
+/**
+ * Fonction pour vérifier si un QR code existe pour un module
+ */
+function moduleQRCodeExists($module_id) {
+    $qr_file = "../qr_codes/mdva_module_" . $module_id . ".png";
+    return file_exists($qr_file);
+}
+
+/**
+ * Fonction pour obtenir l'URL du QR code d'un module
+ */
+function getModuleQRCodeUrl($module_id) {
+    $qr_file = "qr_codes/mdva_module_" . $module_id . ".png";
+    if (file_exists("../" . $qr_file)) {
+        return $qr_file;
+    }
+    return null;
+}
 ?>

@@ -8,6 +8,10 @@ if(!isset($_SESSION['user_type']) || $_SESSION['user_type'] != 'admin') {
 require_once '../config/database.php';
 require_once '../includes/functions.php';
 
+// FIX: Update the path in functions.php OR include the library directly here
+// First, let's include the QR code library directly with the correct path
+require_once 'qrlib/phpqrcode/qrlib.php';
+
 $database = new Database();
 $db = $database->getConnection();
 
@@ -27,8 +31,29 @@ if (isset($_POST['generate_single'])) {
             $preview_data = $module_id;
         }
     } elseif (!empty($barcode_data)) {
-        // Utiliser AJAX pour générer le code-barres
-        $preview_file = ''; // Sera défini via AJAX
+        // Generate QR code for custom data
+        $custom_data = $barcode_data;
+        
+        // Create a custom QR code directory if it doesn't exist
+        $custom_qr_dir = "../custom_qr_codes/";
+        if (!file_exists($custom_qr_dir)) {
+            mkdir($custom_qr_dir, 0755, true);
+        }
+        
+        // Generate QR code using the installed library
+        $qr_file = $custom_qr_dir . 'custom_' . md5($custom_data . time()) . '.png';
+        
+        if ($type == 'QRCODE') {
+            // Generate QR code
+            QRcode::png($custom_data, $qr_file, QR_ECLEVEL_L, 10, 2);
+        } else {
+            // For barcode types, we only have QR code library installed
+            // You'll need additional libraries for CODE128/CODE39 barcodes
+            QRcode::png($custom_data, $qr_file, QR_ECLEVEL_L, 10, 2);
+        }
+        
+        $success_message = "Code généré pour : " . htmlspecialchars($barcode_data);
+        $preview_file = $qr_file;
         $preview_data = $barcode_data;
     }
 }
@@ -55,11 +80,26 @@ function getActiveModules($db) {
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
+// Function to generate QR code for custom data
+function generateCustomQRCode($data, $type = 'QRCODE', $filename = null) {
+    if ($filename === null) {
+        $custom_qr_dir = "../custom_qr_codes/";
+        if (!file_exists($custom_qr_dir)) {
+            mkdir($custom_qr_dir, 0755, true);
+        }
+        $filename = $custom_qr_dir . 'custom_' . md5($data . time()) . '.png';
+    }
+    
+    // Only generate QR codes since that's what we have installed
+    QRcode::png($data, $filename, QR_ECLEVEL_L, 10, 2);
+    return $filename;
+}
+
 include '../includes/header.php';
 ?>
 
 <div class="container mt-4">
-    <h2>Générer des Codes QR et Codes-barres</h2>
+    <h2>Générer des Codes QR</h2>
     
     <?php if(isset($success_message)): ?>
     <div class="alert alert-success"><?php echo $success_message; ?></div>
@@ -73,7 +113,7 @@ include '../includes/header.php';
                     <h5 class="mb-0">Générer un Code Unique</h5>
                 </div>
                 <div class="card-body">
-                    <form id="barcodeForm" method="POST">
+                    <form method="POST">
                         <div class="mb-3">
                             <label class="form-label">Générer pour un Module</label>
                             <select name="module_id" id="module_id" class="form-control">
@@ -89,22 +129,15 @@ include '../includes/header.php';
                         <div class="text-center my-3">OU</div>
                         
                         <div class="mb-3">
-                            <label class="form-label">Code-barres/QR Code Personnalisé</label>
+                            <label class="form-label">QR Code Personnalisé</label>
                             <input type="text" name="barcode_data" id="barcode_data" class="form-control" 
-                                   placeholder="Entrez du texte ou des nombres personnalisés">
+                                   placeholder="Entrez du texte pour générer un QR Code">
                         </div>
                         
-                        <div class="mb-3">
-                            <label class="form-label">Type de Code</label>
-                            <select name="type" id="barcode_type" class="form-control">
-                                <option value="QRCODE">QR Code</option>
-                                <option value="CODE128">Code-barres (CODE128)</option>
-                                <option value="CODE39">Code-barres (CODE39)</option>
-                            </select>
-                        </div>
+                        <input type="hidden" name="type" value="QRCODE">
                         
                         <button type="submit" name="generate_single" class="btn btn-primary">
-                            <i class="fas fa-qrcode"></i> Générer le Code
+                            <i class="fas fa-qrcode"></i> Générer le QR Code
                         </button>
                     </form>
                 </div>
@@ -113,21 +146,43 @@ include '../includes/header.php';
             <!-- Section Aperçu -->
             <div class="card mt-3">
                 <div class="card-header">
-                    <h5 class="mb-0">Aperçu & Impression</h5>
+                    <h5 class="mb-0">Aperçu & Téléchargement</h5>
                 </div>
                 <div class="card-body">
+                    <?php if(isset($preview_file) && file_exists($preview_file)): ?>
+                    <div id="codePreview" class="text-center mb-3" style="min-height: 200px; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                        <img src="<?php echo htmlspecialchars($preview_file); ?>" alt="QR Code" style="max-width: 200px; height: auto; border: 1px solid #ddd; padding: 10px; background: white;">
+                        <p class="mt-2"><?php echo htmlspecialchars($preview_data); ?></p>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <a href="<?php echo htmlspecialchars($preview_file); ?>" download="qrcode_<?php echo htmlspecialchars($preview_data); ?>.png" class="btn btn-success">
+                            <i class="fas fa-download"></i> Télécharger ce QR Code
+                        </a>
+                        <button onclick="printQRCode()" class="btn btn-outline-primary">
+                            <i class="fas fa-print"></i> Imprimer ce Code
+                        </button>
+                        <a href="print_bulk_labels.php" class="btn btn-outline-secondary">
+                            <i class="fas fa-tags"></i> Imprimer des Étiquettes Multiples
+                        </a>
+                    </div>
+                    <?php else: ?>
                     <div id="codePreview" class="text-center mb-3" style="min-height: 200px; border: 1px dashed #ccc; padding: 20px; display: flex; align-items: center; justify-content: center;">
                         <p class="text-muted">Le code généré apparaîtra ici</p>
                     </div>
                     
                     <div class="d-grid gap-2">
-                        <button id="printSingle" class="btn btn-success" disabled onclick="printSingleCode()">
+                        <button class="btn btn-success" disabled>
+                            <i class="fas fa-download"></i> Télécharger ce QR Code
+                        </button>
+                        <button class="btn btn-outline-primary" disabled>
                             <i class="fas fa-print"></i> Imprimer ce Code
                         </button>
-                        <a href="print_bulk_labels.php" class="btn btn-outline-primary">
+                        <a href="print_bulk_labels.php" class="btn btn-outline-secondary">
                             <i class="fas fa-tags"></i> Imprimer des Étiquettes Multiples
                         </a>
                     </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -153,10 +208,17 @@ include '../includes/header.php';
                     <h6>Spécifications d'Impression :</h6>
                     <ul>
                         <li><strong>Codes QR :</strong> 2x2 pouces minimum pour une numérisation fiable</li>
-                        <li><strong>Codes-barres :</strong> Ajuster la hauteur selon la distance de numérisation</li>
+                        <li><strong>Résolution :</strong> 300 DPI minimum pour une impression de qualité</li>
                         <li><strong>Matériau :</strong> Utiliser du vinyle adhésif pour les modules extérieurs</li>
                         <li><strong>Placement :</strong> Emplacement visible et facilement numérisable</li>
                     </ul>
+                    
+                    <div class="alert alert-warning">
+                        <small>
+                            <strong>Note :</strong> La fonctionnalité de code-barres (CODE128/CODE39) nécessite des bibliothèques supplémentaires. 
+                            Actuellement, seuls les QR Codes sont disponibles.
+                        </small>
+                    </div>
                     
                     <div class="alert alert-info">
                         <small>
@@ -166,73 +228,54 @@ include '../includes/header.php';
                     </div>
                 </div>
             </div>
+            
+            <!-- Instructions d'installation -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5 class="mb-0">Instructions d'Utilisation</h5>
+                </div>
+                <div class="card-body">
+                    <h6>Pour utiliser dans vos propres pages :</h6>
+                    <pre><code>&lt;?php
+// Inclure la bibliothèque QR Code
+require_once 'qrlib/phpqrcode/qrlib.php';
+
+// Générer un QR Code et le sauvegarder
+QRcode::png('Vos données ici', 'chemin/fichier.png', QR_ECLEVEL_L, 10);
+
+// Ou afficher directement dans le navigateur
+QRcode::png('Vos données ici');
+?&gt;</code></pre>
+                    
+                    <p class="mt-2"><small>Les codes QR générés sont stockés dans :</small></p>
+                    <ul class="small">
+                        <li>Modules : <code>/qr_codes/</code></li>
+                        <li>Données personnalisées : <code>/custom_qr_codes/</code></li>
+                    </ul>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
 <script>
-// Gérer la soumission du formulaire avec AJAX pour l'aperçu
-document.getElementById('barcodeForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    const moduleId = document.getElementById('module_id').value;
-    const barcodeData = document.getElementById('barcode_data').value;
-    const barcodeType = document.getElementById('barcode_type').value;
-    
-    // Si un module est sélectionné, utiliser la soumission normale du formulaire pour les codes QR
-    if (moduleId) {
-        this.submit();
+function printQRCode() {
+    const previewImg = document.querySelector('#codePreview img');
+    if (!previewImg) {
+        alert('Aucun QR Code à imprimer');
         return;
     }
-    
-    // Si données personnalisées, utiliser AJAX
-    if (barcodeData) {
-        const formData = new FormData();
-        formData.append('data', barcodeData);
-        formData.append('type', barcodeType);
-        formData.append('width', 2);
-        formData.append('height', 1);
-        
-        fetch('generate_barcode.php', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                document.getElementById('codePreview').innerHTML = data.html;
-                document.getElementById('printSingle').disabled = false;
-                window.currentCode = {
-                    url: data.barcode_url,
-                    data: barcodeData,
-                    type: barcodeType
-                };
-            } else {
-                alert('Erreur : ' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Erreur :', error);
-            alert('Erreur lors de la génération du code');
-        });
-    } else {
-        alert('Veuillez entrer des données ou sélectionner un module');
-    }
-});
-
-function printSingleCode() {
-    if (!window.currentCode) return;
     
     const printWindow = window.open('', '_blank');
     printWindow.document.write(`
         <!DOCTYPE html>
         <html>
         <head>
-            <title>Imprimer ${window.currentCode.type}</title>
+            <title>Imprimer QR Code</title>
             <style>
                 body { 
                     margin: 0; 
-                    padding: 20px; 
+                    padding: 0; 
                     display: flex; 
                     justify-content: center; 
                     align-items: center;
@@ -241,25 +284,23 @@ function printSingleCode() {
                 }
                 .code-container {
                     text-align: center;
-                    border: 1px solid #000;
                     padding: 20px;
-                    max-width: 300px;
-                    margin: 0 auto;
                 }
                 .code-container img {
-                    max-width: 100%;
+                    max-width: 300px;
                     height: auto;
+                    border: 1px solid #000;
                 }
                 @media print {
                     body { margin: 0; padding: 0; }
-                    .code-container { border: none; }
+                    .code-container { page-break-inside: avoid; }
                 }
             </style>
         </head>
         <body>
             <div class="code-container">
-                <img src="${window.currentCode.url}" alt="${window.currentCode.type}">
-                <div style="margin-top: 10px; font-size: 14px; font-weight: bold;">${window.currentCode.data}</div>
+                <img src="${previewImg.src}" alt="QR Code">
+                <div style="margin-top: 10px; font-size: 14px; font-weight: bold;">${previewImg.nextElementSibling.textContent}</div>
                 <div style="margin-top: 5px; font-size: 10px; color: #666;">
                     Système MDVA • ${new Date().toLocaleDateString()}
                 </div>
@@ -269,7 +310,7 @@ function printSingleCode() {
                     window.print();
                     setTimeout(function() {
                         window.close();
-                    }, 1000);
+                    }, 500);
                 };
             <\/script>
         </body>
