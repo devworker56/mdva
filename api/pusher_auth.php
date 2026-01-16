@@ -1,5 +1,5 @@
 <?php
-// pusher_auth.php - VERSION SIMPLIFIÉE ET FONCTIONNELLE
+// pusher_auth.php - VERSION CORRIGÉE AVEC VARIABLES D'ENVIRONNEMENT
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
@@ -8,14 +8,26 @@ error_log("=== POINT D'ACCÈS D'AUTHENTIFICATION PUSHER ATTEINT ===");
 error_log("Méthode de requête : " . $_SERVER['REQUEST_METHOD']);
 error_log("Paramètres GET : " . json_encode($_GET));
 
-// Définir les identifiants Pusher directement (depuis votre config)
-define('PUSHER_APP_ID', '2065620');
-define('PUSHER_KEY', 'fe6f264f2fba2f7bc4a2'); 
-define('PUSHER_SECRET', '7cf64dce7ff9a89e0450');
-define('PUSHER_CLUSTER', 'us2');
+// Charger l'autoloader et le loader pour utiliser env()
+require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../config/loader.php'; // Assurez-vous que ce chemin est correct
+
+// Utiliser les variables d'environnement comme dans pusher.php
+define('PUSHER_APP_ID', env('PUSHER_APP_ID', ''));
+define('PUSHER_KEY', env('PUSHER_APP_KEY', '')); 
+define('PUSHER_SECRET', env('PUSHER_APP_SECRET', ''));
+define('PUSHER_CLUSTER', env('PUSHER_APP_CLUSTER', 'us2'));
+
+// Vérifier les credentials au début
+if (empty(PUSHER_APP_ID) || empty(PUSHER_KEY) || empty(PUSHER_SECRET)) {
+    error_log("❌ Credentials Pusher manquants dans les variables d'environnement");
+    http_response_code(500);
+    echo json_encode(['success' => false, 'message' => 'Configuration Pusher manquante']);
+    exit;
+}
 
 // Vérifier si les fichiers requis existent
-$config_file = '../config/database.php';
+$config_file = __DIR__ . '/../config/database.php'; // Utiliser __DIR__ pour un chemin absolu
 
 error_log("Le fichier de config de la base de données existe : " . (file_exists($config_file) ? 'OUI' : 'NON'));
 
@@ -43,6 +55,7 @@ try {
     $socket_id = $_GET['socket_id'] ?? '';
 
     error_log("Demande d'authentification - Canal : $channel, ID de socket : $socket_id");
+    error_log("Cluster Pusher utilisé : " . PUSHER_CLUSTER);
 
     if (empty($channel) || empty($socket_id)) {
         error_log("❌ Canal ou socket_id manquant");
@@ -72,19 +85,25 @@ try {
         if ($module) {
             error_log("✅ Module trouvé et actif : " . $module['name']);
             
-            // AUTHENTIFICATION MANUELLE (garantie de fonctionner)
+            // AUTHENTIFICATION MANUELLE
             $string_to_sign = $socket_id . ':' . $channel;
             $auth_signature = hash_hmac('sha256', $string_to_sign, PUSHER_SECRET, false);
             $auth = PUSHER_KEY . ':' . $auth_signature;
             
             error_log("✅ Authentification manuelle générée avec succès");
             error_log("✅ Chaîne à signer : " . $string_to_sign);
-            error_log("✅ Signature d'authentification : " . $auth_signature);
-            error_log("✅ Authentification finale : " . $auth);
+            error_log("✅ Signature d'authentification générée");
             
             echo json_encode([
                 'success' => true,
                 'auth' => $auth,
+                'channel_data' => json_encode([
+                    'user_id' => 'module_' . $module['module_id'],
+                    'user_info' => [
+                        'name' => $module['name'],
+                        'id' => $module['id']
+                    ]
+                ]),
                 'module' => [
                     'id' => $module['id'],
                     'module_id' => $module['module_id'],
