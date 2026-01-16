@@ -1,5 +1,5 @@
 <?php
-// charity_dashboard.php - UPDATED VERSION WITH API INTEGRATION
+// charity_dashboard.php - UPDATED VERSION WITH ONLY CHARITY-RELEVANT FEATURES
 session_start();
 if(!isset($_SESSION['user_type']) || $_SESSION['user_type'] != 'charity') {
     header("Location: ../auth/login.php");
@@ -8,21 +8,21 @@ if(!isset($_SESSION['user_type']) || $_SESSION['user_type'] != 'charity') {
 include '../includes/header.php';
 
 require_once '../config/database.php';
-require_once '../includes/functions.php'; // Include functions for Pusher
+require_once '../includes/functions.php';
 
 $database = new Database();
 $db = $database->getConnection();
 
 $charity_id = $_SESSION['user_id'];
 
-// Get charity stats - Updated query to match new structure
+// Get charity stats
 $query = "SELECT 
-            SUM(d.amount) as total_donations, 
+            SUM(amount) as total_donations, 
             COUNT(*) as donation_count,
-            AVG(d.amount) as average_donation,
-            COUNT(DISTINCT d.donor_id) as unique_donors
-          FROM donations d 
-          WHERE d.charity_id = ?";
+            AVG(amount) as average_donation,
+            COUNT(DISTINCT session_id) as unique_sessions
+          FROM donations 
+          WHERE charity_id = ?";
 $stmt = $db->prepare($query);
 $stmt->execute([$charity_id]);
 $stats = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -33,20 +33,17 @@ $charity_stmt = $db->prepare($charity_query);
 $charity_stmt->execute([$charity_id]);
 $charity = $charity_stmt->fetch(PDO::FETCH_ASSOC);
 
-// Get recent donations with session info - Updated query
+// Get recent donations with location info (for charity insight)
 $query = "SELECT 
             d.amount, 
             d.created_at, 
             d.coin_count,
-            do.user_id as donor_user_id, 
-            m.name as module_name, 
-            l.name as location_name, 
+            d.session_id,
+            m.name as module_name,
+            l.name as location_name,
             l.city, 
-            l.province,
-            ds.id as session_id
+            l.province
           FROM donations d 
-          JOIN donors do ON d.donor_id = do.id 
-          JOIN donation_sessions ds ON d.session_id = ds.id
           LEFT JOIN modules m ON d.module_id = m.module_id
           LEFT JOIN module_locations ml ON m.id = ml.module_id AND ml.status = 'active'
           LEFT JOIN locations l ON ml.location_id = l.id
@@ -136,10 +133,9 @@ $today_stats = $today_stmt->fetch(PDO::FETCH_ASSOC);
                                 <table class="table table-striped">
                                     <thead>
                                         <tr>
-                                            <th>ID Donateur</th>
                                             <th>Montant</th>
                                             <th>Pièces</th>
-                                            <th>Module/Lieu</th>
+                                            <th>Lieu/Module</th>
                                             <th>Session</th>
                                             <th>Date</th>
                                         </tr>
@@ -147,17 +143,19 @@ $today_stats = $today_stmt->fetch(PDO::FETCH_ASSOC);
                                     <tbody id="donations-table">
                                         <?php foreach($recent_donations as $donation): ?>
                                         <tr>
-                                            <td><?php echo htmlspecialchars($donation['donor_user_id']); ?></td>
                                             <td><?php echo number_format($donation['amount'], 2); ?> $</td>
                                             <td><?php echo $donation['coin_count']; ?></td>
                                             <td>
                                                 <?php 
                                                 if ($donation['location_name']) {
-                                                    echo htmlspecialchars($donation['location_name']) . ', ' . 
+                                                    echo htmlspecialchars($donation['location_name']) . '<br>';
+                                                    echo '<small class="text-muted">' . 
                                                          htmlspecialchars($donation['city']) . ', ' . 
-                                                         htmlspecialchars($donation['province']);
+                                                         htmlspecialchars($donation['province']) . '</small>';
+                                                } else if ($donation['module_name']) {
+                                                    echo htmlspecialchars($donation['module_name']);
                                                 } else {
-                                                    echo htmlspecialchars($donation['module_name'] ?? 'Inconnu');
+                                                    echo 'Inconnu';
                                                 }
                                                 ?>
                                             </td>
@@ -177,8 +175,65 @@ $today_stats = $today_stmt->fetch(PDO::FETCH_ASSOC);
         </div>
     </div>
 
-    <!-- Quick Stats -->
+    <!-- Performance by Location -->
     <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Performance par Lieu</h5>
+                </div>
+                <div class="card-body">
+                    <?php
+                    // Get donations by location for this charity
+                    $location_query = "SELECT 
+                                        l.name as location_name,
+                                        l.city,
+                                        l.province,
+                                        COUNT(d.id) as donation_count,
+                                        SUM(d.amount) as total_amount
+                                      FROM donations d
+                                      LEFT JOIN modules m ON d.module_id = m.module_id
+                                      LEFT JOIN module_locations ml ON m.id = ml.module_id AND ml.status = 'active'
+                                      LEFT JOIN locations l ON ml.location_id = l.id
+                                      WHERE d.charity_id = ? 
+                                        AND l.name IS NOT NULL
+                                      GROUP BY l.id
+                                      ORDER BY total_amount DESC
+                                      LIMIT 5";
+                    $location_stmt = $db->prepare($location_query);
+                    $location_stmt->execute([$charity_id]);
+                    $location_stats = $location_stmt->fetchAll(PDO::FETCH_ASSOC);
+                    
+                    if(empty($location_stats)): ?>
+                        <p class="text-muted">Aucune donnée de localisation disponible.</p>
+                    <?php else: ?>
+                        <div class="list-group">
+                            <?php foreach($location_stats as $location): ?>
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong><?php echo htmlspecialchars($location['location_name']); ?></strong>
+                                        <br>
+                                        <small class="text-muted">
+                                            <?php echo htmlspecialchars($location['city']) . ', ' . htmlspecialchars($location['province']); ?>
+                                        </small>
+                                    </div>
+                                    <div class="text-end">
+                                        <span class="badge bg-primary rounded-pill">
+                                            <?php echo number_format($location['total_amount'], 2); ?> $
+                                        </span>
+                                        <br>
+                                        <small><?php echo $location['donation_count']; ?> dons</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+        
         <div class="col-md-6">
             <div class="card">
                 <div class="card-header">
@@ -217,106 +272,27 @@ $today_stats = $today_stmt->fetch(PDO::FETCH_ASSOC);
                 </div>
             </div>
         </div>
-        
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">Modules Actifs</h5>
-                </div>
-                <div class="card-body">
-                    <?php
-                    // Get active modules for this charity
-                    $modules_query = "SELECT 
-                                        m.module_id,
-                                        m.name,
-                                        l.name as location_name,
-                                        l.city,
-                                        COUNT(d.id) as donation_count,
-                                        SUM(d.amount) as total_amount
-                                      FROM modules m
-                                      LEFT JOIN donations d ON m.module_id = d.module_id AND d.charity_id = ?
-                                      LEFT JOIN module_locations ml ON m.id = ml.module_id AND ml.status = 'active'
-                                      LEFT JOIN locations l ON ml.location_id = l.id
-                                      WHERE m.charity_id = ?
-                                      GROUP BY m.id
-                                      ORDER BY total_amount DESC";
-                    $modules_stmt = $db->prepare($modules_query);
-                    $modules_stmt->execute([$charity_id, $charity_id]);
-                    $modules = $modules_stmt->fetchAll(PDO::FETCH_ASSOC);
-                    
-                    if(empty($modules)): ?>
-                        <p class="text-muted">Aucun module configuré.</p>
-                    <?php else: ?>
-                        <div class="list-group">
-                            <?php foreach($modules as $module): ?>
-                            <div class="list-group-item">
-                                <div class="d-flex justify-content-between">
-                                    <strong><?php echo htmlspecialchars($module['name']); ?></strong>
-                                    <span><?php echo $module['donation_count']; ?> dons</span>
-                                </div>
-                                <small class="text-muted">
-                                    <?php echo htmlspecialchars($module['location_name'] ?? 'Localisation non définie'); ?>
-                                    <?php if($module['city']): ?> - <?php echo htmlspecialchars($module['city']); endif; ?>
-                                </small>
-                                <div class="mt-1">
-                                    <small>Total: <?php echo number_format($module['total_amount'] ?? 0, 2); ?> $</small>
-                                </div>
-                            </div>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </div>
     </div>
 </div>
 
 <!-- Include Pusher -->
 <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
 <script>
-// Initialize Pusher - Use the same key as in the API
+// Initialize Pusher
 const pusher = new Pusher('fe6f264f2fba2f7bc4a2', {
     cluster: 'us2',
     encrypted: true
 });
 
-// Subscribe to charity channel - FIXED: Using proper channel name format
+// Subscribe to charity channel
 const channel = pusher.subscribe('charity_<?php echo $charity_id; ?>');
 
-// Debug: Log subscription status
-console.log('Subscribing to channel:', 'charity_<?php echo $charity_id; ?>');
-console.log('Channel subscription status:', channel.subscribed);
-
-// Listen for connection events
-pusher.connection.bind('connected', function() {
-    console.log('Pusher connected successfully');
-    console.log('Socket ID:', pusher.connection.socket_id);
-});
-
-pusher.connection.bind('error', function(err) {
-    console.error('Pusher connection error:', err);
-});
-
-// Listen for subscription events
-channel.bind('pusher:subscription_succeeded', function() {
-    console.log('Successfully subscribed to charity channel: charity_<?php echo $charity_id; ?>');
-    document.getElementById('realtime-status').textContent = 'Connecté aux mises à jour en temps réel';
-    document.getElementById('realtime-status').style.color = '#198754';
-});
-
-channel.bind('pusher:subscription_error', function(err) {
-    console.error('Subscription error:', err);
-    document.getElementById('realtime-status').textContent = 'Erreur de connexion - veuillez rafraîchir la page';
-    document.getElementById('realtime-status').style.color = '#dc3545';
-});
-
-// Listen for the correct event name: 'new_donation' (matches donations.php)
+// Listen for new donations
 channel.bind('new_donation', function(data) {
-    console.log('Nouveau don reçu sur le tableau de bord:', data);
+    console.log('Nouveau don reçu:', data);
     
     // Verify this is for the correct charity
     if (data.charity_id != <?php echo $charity_id; ?>) {
-        console.log('Donation is for different charity:', data.charity_id, 'expected:', <?php echo $charity_id; ?>);
         return;
     }
     
@@ -352,8 +328,11 @@ channel.bind('new_donation', function(data) {
 function addDonationToTable(data) {
     const tableBody = document.getElementById('donations-table');
     
-    // Format location - use module_id as location if location not provided
-    const location = data.location || data.module_id || 'Station inconnue';
+    // Format location info
+    let locationInfo = data.location_name || data.module_name || 'Inconnu';
+    if (data.city && data.province) {
+        locationInfo += '<br><small class="text-muted">' + data.city + ', ' + data.province + '</small>';
+    }
     
     // Format session ID
     const sessionId = data.session_id ? data.session_id.substring(0, 8) + '...' : 'N/A';
@@ -365,10 +344,9 @@ function addDonationToTable(data) {
     const newRow = document.createElement('tr');
     newRow.className = 'new-donation';
     newRow.innerHTML = `
-        <td>${data.donor_id || 'Inconnu'}</td>
         <td>$${parseFloat(data.amount).toFixed(2)}</td>
         <td>${data.coin_count || 0}</td>
-        <td>${data.charity_name || 'N/A'}</td>
+        <td>${locationInfo}</td>
         <td><small class="text-muted">${sessionId}</small></td>
         <td>${timestamp.toLocaleDateString('fr-CA', { 
             day: 'numeric', 
@@ -399,10 +377,16 @@ function addDonationToTable(data) {
 
 // Function to show toast notification
 function showToastNotification(data) {
-    // Create toast element
     const toastContainer = document.createElement('div');
     toastContainer.className = 'position-fixed bottom-0 end-0 p-3';
     toastContainer.style.zIndex = '1050';
+    
+    let locationText = '';
+    if (data.location_name) {
+        locationText = `<br><small>${data.location_name}</small>`;
+    } else if (data.module_name) {
+        locationText = `<br><small>${data.module_name}</small>`;
+    }
     
     toastContainer.innerHTML = `
         <div class="toast show" role="alert" aria-live="assertive" aria-atomic="true">
@@ -411,8 +395,7 @@ function showToastNotification(data) {
                 <button type="button" class="btn-close btn-close-white" onclick="this.parentElement.parentElement.parentElement.remove()"></button>
             </div>
             <div class="toast-body">
-                <strong>$${parseFloat(data.amount).toFixed(2)}</strong> de ${data.donor_id || 'Donateur'}<br>
-                <small>${data.charity_name || 'Organisme'}</small>
+                <strong>$${parseFloat(data.amount).toFixed(2)}</strong>${locationText}
                 ${data.coin_count ? `<br><small>${data.coin_count} pièces</small>` : ''}
             </div>
         </div>
@@ -437,19 +420,6 @@ function refreshDonations() {
                 updateDonationsTable(data.donations);
                 // Hide notification badge
                 document.getElementById('new-donations-badge').style.display = 'none';
-                
-                // Update stats from API
-                fetch(`../api/donations.php?action=stats&donor_id=<?php echo $charity_id; ?>`)
-                    .then(response => response.json())
-                    .then(statsData => {
-                        if(statsData.success) {
-                            const stats = statsData.stats;
-                            document.getElementById('total-donations').textContent = 
-                                (stats.total_donated ? parseFloat(stats.total_donated).toFixed(2) : '0.00') + ' $';
-                            document.getElementById('donation-count').textContent = 
-                                stats.donation_count || 0;
-                        }
-                    });
             }
         })
         .catch(error => console.error('Erreur de rafraîchissement:', error));
@@ -460,12 +430,17 @@ function updateDonationsTable(donations) {
     tableBody.innerHTML = '';
     
     donations.forEach(donation => {
+        // Format location info
+        let locationInfo = donation.location_name || donation.module_name || 'Inconnu';
+        if (donation.city && donation.province) {
+            locationInfo += '<br><small class="text-muted">' + donation.city + ', ' + donation.province + '</small>';
+        }
+        
         const row = document.createElement('tr');
         row.innerHTML = `
-            <td>${donation.donor_id || 'Inconnu'}</td>
             <td>$${parseFloat(donation.amount).toFixed(2)}</td>
             <td>${donation.coin_count || 0}</td>
-            <td>${donation.charity_name || 'N/A'}</td>
+            <td>${locationInfo}</td>
             <td><small class="text-muted">${donation.session_id ? donation.session_id.substring(0, 8) + '...' : 'N/A'}</small></td>
             <td>${new Date(donation.created_at).toLocaleDateString('fr-CA', { 
                 day: 'numeric', 
@@ -478,27 +453,6 @@ function updateDonationsTable(donations) {
         tableBody.appendChild(row);
     });
 }
-
-// Connection status
-pusher.connection.bind('connected', () => {
-    document.getElementById('realtime-status').textContent = 'Connecté aux mises à jour en temps réel';
-    document.getElementById('realtime-status').style.color = '#198754';
-});
-
-pusher.connection.bind('disconnected', () => {
-    document.getElementById('realtime-status').textContent = 'Déconnecté - reconnection en cours...';
-    document.getElementById('realtime-status').style.color = '#ffc107';
-});
-
-pusher.connection.bind('failed', () => {
-    document.getElementById('realtime-status').textContent = 'Connexion échouée';
-    document.getElementById('realtime-status').style.color = '#dc3545';
-});
-
-// Test Pusher connection on load
-console.log('Initializing Pusher for charity dashboard');
-console.log('Charity ID:', <?php echo $charity_id; ?>);
-console.log('Charity Name:', '<?php echo $charity['name'] ?? ''; ?>');
 </script>
 
 <style>
