@@ -269,8 +269,12 @@ function check_password_strength($password) {
     return $strength >= 4; // Au moins 4 critères sur 5
 }
 
+// =============================================================================
+// FONCTIONS POUR LA GÉNÉRATION DE CODES QR ESP32
+// =============================================================================
+
 /**
- * Générer les données de code QR pour le Module MDVA
+ * Générer les données de code QR pour le Module MDVA (ESP32 format)
  */
 function generateModuleQRData($module_id, $module_name = '', $location = '') {
     $qr_data = [
@@ -288,17 +292,13 @@ function generateModuleQRData($module_id, $module_name = '', $location = '') {
 }
 
 /**
- * Générer un code QR unique pour un module
+ * Générer un code QR unique pour un module (ESP32 format)
  */
 function generateModuleQRCode($module_id, $module_name = '', $location = '', $save_path = null) {
-    // CORRECTED PATH: Use the installed QR code library
-    // The library is installed at: public_html/qrlib/phpqrcode/qrlib.php
-    // Since this function is called from files in public_html, use relative path
     require_once 'qrlib/phpqrcode/qrlib.php';
     
     $qr_data = generateModuleQRData($module_id, $module_name, $location);
     
-    // Si aucun chemin de sauvegarde n'est fourni, générer un nom de fichier
     if ($save_path === null) {
         $qr_dir = "../qr_codes/";
         if (!file_exists($qr_dir)) {
@@ -307,17 +307,15 @@ function generateModuleQRCode($module_id, $module_name = '', $location = '', $sa
         $save_path = $qr_dir . "mdva_module_" . $module_id . ".png";
     }
     
-    // Générer et sauvegarder le code QR
     QRcode::png($qr_data, $save_path, QR_ECLEVEL_L, 10, 2);
     
     return $save_path;
 }
 
 /**
- * Générer plusieurs codes QR pour tous les modules
+ * Générer plusieurs codes QR pour tous les modules (ESP32 format)
  */
 function generateAllModuleQRCodes($db) {
-    // CORRECTED PATH: Use the installed QR code library
     require_once 'qrlib/phpqrcode/qrlib.php';
     
     $qr_dir = "../qr_codes/";
@@ -325,12 +323,20 @@ function generateAllModuleQRCodes($db) {
         mkdir($qr_dir, 0755, true);
     }
     
-    // Obtenir tous les modules actifs
-    $query = "SELECT m.*, l.name as location_name, l.address, l.city, l.state 
-              FROM modules m 
+    // UPDATED QUERY: Get modules with complete location information
+    $query = "SELECT 
+                m.module_id,
+                m.name as module_name,
+                COALESCE(l.name, m.location) as location_name,
+                l.address,
+                l.city,
+                l.province,
+                l.postal_code
+              FROM modules m
               LEFT JOIN module_locations ml ON m.id = ml.module_id AND ml.status = 'active'
-              LEFT JOIN locations l ON ml.location_id = l.id 
+              LEFT JOIN locations l ON ml.location_id = l.id
               WHERE m.status = 'active'";
+    
     $stmt = $db->prepare($query);
     $stmt->execute();
     $modules = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -338,29 +344,195 @@ function generateAllModuleQRCodes($db) {
     $generated = [];
     
     foreach ($modules as $module) {
-        $location = $module['location_name'] ? 
-            $module['location_name'] . ', ' . $module['address'] . ', ' . $module['city'] . ', ' . $module['state'] : 
-            $module['location'];
-            
+        // Build location string in ESP32 format
+        $location_string = $module['location_name'] ?: '';
+        if ($module['address']) $location_string .= ', ' . $module['address'];
+        if ($module['city']) $location_string .= ', ' . $module['city'];
+        if ($module['province']) $location_string .= ', ' . $module['province'];
+        if ($module['postal_code']) $location_string .= ' ' . $module['postal_code'];
+        
+        // Create QR data in ESP32 format
+        $qr_data = [
+            'module_id' => $module['module_id'],
+            'module_name' => $module['module_name'],
+            'location' => $location_string,
+            'system' => 'MDVA',
+            'type' => 'donation_module',
+            'version' => '1.0',
+            'timestamp' => time(),
+            'url' => "https://systeme-mdva.com/module/" . urlencode($module['module_id'])
+        ];
+        
+        $qr_data_json = json_encode($qr_data);
+        
         $filename = "mdva_module_" . $module['module_id'] . ".png";
         $filepath = $qr_dir . $filename;
         
-        // Générer le code QR en utilisant la fonction de code QR unique
-        generateModuleQRCode(
-            $module['module_id'],
-            $module['name'],
-            $location,
-            $filepath
-        );
+        // Generate QR code with ESP32 format data
+        QRcode::png($qr_data_json, $filepath, QR_ECLEVEL_L, 10, 2);
         
         $generated[] = [
             'module_id' => $module['module_id'],
-            'module_name' => $module['name'],
-            'qr_file' => $filename
+            'module_name' => $module['module_name'],
+            'qr_file' => $filename,
+            'qr_data' => $qr_data
         ];
     }
     
     return $generated;
+}
+
+/**
+ * Sauvegarder un nouveau module dans la base de données et générer le QR code
+ */
+function saveModuleToDatabaseAndGenerateQR($module_data, $db) {
+    try {
+        $db->beginTransaction();
+        
+        // Extract form data
+        $module_id = $module_data['module_id'] ?? '';
+        $module_name = $module_data['module_name'] ?? '';
+        $mac_address = $module_data['mac_address'] ?? '';
+        $location_name = $module_data['location_name'] ?? '';
+        $address = $module_data['address'] ?? '';
+        $city = $module_data['city'] ?? '';
+        $province = $module_data['province'] ?? '';
+        $postal_code = $module_data['postal_code'] ?? '';
+        
+        // ========== 1. Save/Update Location ==========
+        $location_id = null;
+        
+        // Check if location already exists
+        $location_query = "SELECT id FROM locations WHERE name = ?";
+        $location_stmt = $db->prepare($location_query);
+        $location_stmt->execute([$location_name]);
+        $existing_location = $location_stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($existing_location) {
+            $location_id = $existing_location['id'];
+            
+            // Update existing location
+            $update_location = "UPDATE locations 
+                               SET address = ?, city = ?, province = ?, postal_code = ?, updated_at = NOW()
+                               WHERE id = ?";
+            $update_stmt = $db->prepare($update_location);
+            $update_stmt->execute([$address, $city, $province, $postal_code, $location_id]);
+        } else {
+            // Insert new location
+            $insert_location = "INSERT INTO locations 
+                               (name, address, city, province, country, postal_code, active, created_at) 
+                               VALUES (?, ?, ?, ?, 'Canada', ?, 1, NOW())";
+            $insert_stmt = $db->prepare($insert_location);
+            $insert_stmt->execute([$location_name, $address, $city, $province, $postal_code]);
+            $location_id = $db->lastInsertId();
+        }
+        
+        // ========== 2. Save/Update Module ==========
+        $module_db_id = null;
+        
+        // Check if module already exists
+        $module_query = "SELECT id FROM modules WHERE module_id = ?";
+        $module_stmt = $db->prepare($module_query);
+        $module_stmt->execute([$module_id]);
+        $existing_module = $module_stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($existing_module) {
+            $module_db_id = $existing_module['id'];
+            
+            // Update existing module
+            $update_module = "UPDATE modules 
+                             SET name = ?, location = ?, mac_address = ?, firmware_version = '1.0',
+                                 status = 'active', updated_at = NOW()
+                             WHERE id = ?";
+            $update_stmt = $db->prepare($update_module);
+            $update_stmt->execute([$module_name, $location_name, $mac_address, $module_db_id]);
+        } else {
+            // Insert new module
+            $insert_module = "INSERT INTO modules 
+                             (module_id, name, location, mac_address, firmware_version, status, created_at) 
+                             VALUES (?, ?, ?, ?, '1.0', 'active', NOW())";
+            $insert_stmt = $db->prepare($insert_module);
+            $insert_stmt->execute([$module_id, $module_name, $location_name, $mac_address]);
+            $module_db_id = $db->lastInsertId();
+        }
+        
+        // ========== 3. Link Module to Location ==========
+        $link_query = "SELECT id FROM module_locations 
+                      WHERE module_id = ? AND location_id = ? AND status = 'active'";
+        $link_stmt = $db->prepare($link_query);
+        $link_stmt->execute([$module_db_id, $location_id]);
+        $existing_link = $link_stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$existing_link) {
+            // Deactivate any existing active links for this module
+            $deactivate_query = "UPDATE module_locations 
+                                SET status = 'removed', removed_at = NOW() 
+                                WHERE module_id = ? AND status = 'active'";
+            $deactivate_stmt = $db->prepare($deactivate_query);
+            $deactivate_stmt->execute([$module_db_id]);
+            
+            // Create new link
+            $insert_link = "INSERT INTO module_locations 
+                           (module_id, location_id, installed_at, status, notes) 
+                           VALUES (?, ?, NOW(), 'active', 'Created via QR Generator')";
+            $insert_link_stmt = $db->prepare($insert_link);
+            $insert_link_stmt->execute([$module_db_id, $location_id]);
+        }
+        
+        // ========== 4. Generate QR Code ==========
+        // Build location string
+        $location_string = $location_name;
+        if ($address) $location_string .= ', ' . $address;
+        if ($city) $location_string .= ', ' . $city;
+        if ($province) $location_string .= ', ' . $province;
+        if ($postal_code) $location_string .= ' ' . $postal_code;
+        
+        // Create QR data in ESP32 format
+        $qr_data = [
+            'module_id' => $module_id,
+            'module_name' => $module_name,
+            'location' => $location_string,
+            'system' => 'MDVA',
+            'type' => 'donation_module',
+            'version' => '1.0',
+            'timestamp' => time(),
+            'url' => "https://systeme-mdva.com/module/" . urlencode($module_id)
+        ];
+        
+        $qr_data_json = json_encode($qr_data);
+        
+        // Generate QR code
+        require_once 'qrlib/phpqrcode/qrlib.php';
+        
+        $qr_dir = "../qr_codes/";
+        if (!file_exists($qr_dir)) {
+            mkdir($qr_dir, 0755, true);
+        }
+        
+        $qr_filename = "mdva_module_" . $module_id . ".png";
+        $qr_path = $qr_dir . $qr_filename;
+        
+        QRcode::png($qr_data_json, $qr_path, QR_ECLEVEL_L, 10, 2);
+        
+        $db->commit();
+        
+        return [
+            'success' => true,
+            'module_id' => $module_id,
+            'module_name' => $module_name,
+            'location' => $location_string,
+            'qr_path' => $qr_path,
+            'qr_data' => $qr_data
+        ];
+        
+    } catch (Exception $e) {
+        $db->rollBack();
+        error_log("Error saving module: " . $e->getMessage());
+        return [
+            'success' => false,
+            'error' => $e->getMessage()
+        ];
+    }
 }
 
 /**
@@ -369,31 +541,26 @@ function generateAllModuleQRCodes($db) {
 function get_system_stats($db) {
     $stats = [];
     
-    // Organismes totaux
     $query = "SELECT COUNT(*) as count FROM charities WHERE approved = 1";
     $stmt = $db->prepare($query);
     $stmt->execute();
     $stats['total_charities'] = $stmt->fetch(PDO::FETCH_ASSOC)['count'];
     
-    // Donateurs totaux
     $query = "SELECT COUNT(*) as count FROM donors";
     $stmt = $db->prepare($query);
     $stmt->execute();
     $stats['total_donors'] = $stmt->fetch(PDO::FETCH_ASSOC)['count'];
     
-    // Dons totaux
     $query = "SELECT SUM(amount) as total FROM donations";
     $stmt = $db->prepare($query);
     $stmt->execute();
     $stats['total_donations'] = $stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
     
-    // Nombre total de dons
     $query = "SELECT COUNT(*) as count FROM donations";
     $stmt = $db->prepare($query);
     $stmt->execute();
     $stats['total_donation_count'] = $stmt->fetch(PDO::FETCH_ASSOC)['count'];
     
-    // Dons d'aujourd'hui
     $query = "SELECT SUM(amount) as total FROM donations WHERE DATE(created_at) = CURDATE()";
     $stmt = $db->prepare($query);
     $stmt->execute();
@@ -408,7 +575,6 @@ function get_system_stats($db) {
 
 /**
  * Obtenir le dernier hash de transaction pour un donateur pour maintenir la chaîne de hash
- * Utilisé pour le système de dons vérifiable FairGive
  */
 function get_last_transaction_hash($donor_id, $db) {
     $query = "SELECT transaction_hash FROM verifiable_transactions 
@@ -419,12 +585,11 @@ function get_last_transaction_hash($donor_id, $db) {
     $stmt->execute([$donor_id]);
     $result = $stmt->fetch(PDO::FETCH_ASSOC);
     
-    return $result ? $result['transaction_hash'] : '0'; // Hash de genèse pour la première transaction
+    return $result ? $result['transaction_hash'] : '0';
 }
 
 /**
  * Créer une transaction vérifiable initiale pour les nouveaux donateurs
- * Utilisé pour le système de dons vérifiable FairGive
  */
 function create_initial_verifiable_transaction($donor_id, $user_id, $db) {
     $timestamp = time();
@@ -433,7 +598,7 @@ function create_initial_verifiable_transaction($donor_id, $user_id, $db) {
         'donor_id' => $user_id,
         'action' => 'account_creation',
         'timestamp' => $timestamp,
-        'previous_hash' => '0' // Bloc de genèse
+        'previous_hash' => '0'
     ];
     
     $transaction_data_json = json_encode($transaction_data);
@@ -458,15 +623,12 @@ function create_initial_verifiable_transaction($donor_id, $user_id, $db) {
 
 /**
  * Créer un enregistrement vérifiable de sélection d'organisme
- * Utilisé pour le système de dons vérifiable FairGive
  */
 function create_verifiable_charity_selection($donor_id, $user_id, $old_charity_id, $new_charity_id, $charity_name, $db) {
     $timestamp = time();
     
-    // Obtenir le hash de la transaction précédente pour maintenir la chaîne
     $previous_hash = get_last_transaction_hash($donor_id, $db);
     
-    // Créer les données de transaction pour le hachage cryptographique
     $transaction_data = [
         'donor_id' => $user_id,
         'old_charity_id' => $old_charity_id,
@@ -477,11 +639,9 @@ function create_verifiable_charity_selection($donor_id, $user_id, $old_charity_i
         'previous_hash' => $previous_hash
     ];
     
-    // Générer le hash cryptographique (vérification de type blockchain)
     $transaction_data_json = json_encode($transaction_data);
     $transaction_hash = hash('sha256', $transaction_data_json);
     
-    // Stocker dans la table des transactions vérifiables
     $query = "INSERT INTO verifiable_transactions 
               (donor_id, transaction_type, transaction_data, transaction_hash, previous_hash, timestamp) 
               VALUES (?, 'charity_selection', ?, ?, ?, ?)";
@@ -494,7 +654,6 @@ function create_verifiable_charity_selection($donor_id, $user_id, $old_charity_i
         date('Y-m-d H:i:s')
     ]);
     
-    // Également journaliser dans la table d'audit pour une visibilité immédiate et des rapports
     $query = "INSERT INTO charity_selection_audit 
               (donor_id, old_charity_id, new_charity_id, transaction_hash, selected_at) 
               VALUES (?, ?, ?, ?, NOW())";
@@ -508,18 +667,14 @@ function create_verifiable_charity_selection($donor_id, $user_id, $old_charity_i
 
 /**
  * Créer un enregistrement vérifiable de don
- * Utilisé pour le système de dons vérifiable FairGive
  */
 function create_verifiable_donation($donor_id, $user_id, $charity_id, $amount, $module_id, $db) {
     $timestamp = time();
     
-    // Obtenir le hash de la transaction précédente pour maintenir la chaîne
     $previous_hash = get_last_transaction_hash($donor_id, $db);
     
-    // Obtenir le nom de l'organisme
     $charity_name = get_charity_name($charity_id, $db);
     
-    // Créer les données de transaction pour le hachage cryptographique
     $transaction_data = [
         'donor_id' => $user_id,
         'charity_id' => $charity_id,
@@ -531,11 +686,9 @@ function create_verifiable_donation($donor_id, $user_id, $charity_id, $amount, $
         'previous_hash' => $previous_hash
     ];
     
-    // Générer le hash cryptographique (vérification de type blockchain)
     $transaction_data_json = json_encode($transaction_data);
     $transaction_hash = hash('sha256', $transaction_data_json);
     
-    // Stocker dans la table des transactions vérifiables
     $query = "INSERT INTO verifiable_transactions 
               (donor_id, transaction_type, transaction_data, transaction_hash, previous_hash, timestamp) 
               VALUES (?, 'donation', ?, ?, ?, ?)";
@@ -555,7 +708,6 @@ function create_verifiable_donation($donor_id, $user_id, $charity_id, $amount, $
 
 /**
  * Vérifier l'intégrité de la chaîne de transaction pour un donateur
- * Utilisé pour l'audit du système de dons vérifiable FairGive
  */
 function verify_donor_transaction_chain($donor_id, $db) {
     $query = "SELECT transaction_hash, previous_hash, transaction_data, timestamp 
@@ -570,16 +722,14 @@ function verify_donor_transaction_chain($donor_id, $db) {
         return ['valid' => true, 'message' => 'Aucune transaction à vérifier'];
     }
     
-    $previous_hash = '0'; // Commencer avec le hash de genèse
+    $previous_hash = '0';
     $issues = [];
     
     foreach ($transactions as $index => $transaction) {
-        // Vérifier si le hash précédent correspond
         if ($transaction['previous_hash'] !== $previous_hash) {
             $issues[] = "La transaction {$transaction['transaction_hash']} a un hash précédent incorrect. Attendu : $previous_hash, Trouvé : {$transaction['previous_hash']}";
         }
         
-        // Vérifier que le hash actuel est correct
         $calculated_hash = hash('sha256', $transaction['transaction_data']);
         if ($calculated_hash !== $transaction['transaction_hash']) {
             $issues[] = "Le hash de la transaction {$transaction['transaction_hash']} ne correspond pas. Les données peuvent avoir été altérées.";
@@ -598,7 +748,6 @@ function verify_donor_transaction_chain($donor_id, $db) {
 
 /**
  * Obtenir l'historique des transactions vérifiables d'un donateur
- * Utilisé pour les rapports du système de dons vérifiable FairGive
  */
 function get_donor_verifiable_history($donor_id, $db, $limit = 50) {
     $query = "SELECT 
@@ -615,7 +764,6 @@ function get_donor_verifiable_history($donor_id, $db, $limit = 50) {
     $stmt->execute([$donor_id, $limit]);
     $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Analyser les données de transaction
     foreach ($transactions as &$transaction) {
         $transaction['parsed_data'] = json_decode($transaction['transaction_data'], true);
     }
@@ -650,7 +798,6 @@ function generate_tax_receipt_data_simple($donor_id, $year, $db) {
         ];
     }
     
-    // Générer un numéro de reçu
     $receipt_number = 'RCPT-' . $year . '-' . str_pad($donor_id, 6, '0', STR_PAD_LEFT) . '-' . time();
     
     return [
@@ -668,14 +815,12 @@ function generate_tax_receipt_data_simple($donor_id, $year, $db) {
 // =============================================================================
 
 /**
- * Fonction pour générer un QR code simple (utilisée par generate_barcode.php)
+ * Fonction pour générer un QR code simple
  */
 function generateSimpleQRCode($data, $filename = null) {
-    // Inclure la bibliothèque QR Code
     require_once 'qrlib/phpqrcode/qrlib.php';
     
     if ($filename === null) {
-        // Créer un fichier temporaire
         $temp_dir = "../temp_qr_codes/";
         if (!file_exists($temp_dir)) {
             mkdir($temp_dir, 0755, true);
@@ -683,7 +828,6 @@ function generateSimpleQRCode($data, $filename = null) {
         $filename = $temp_dir . 'qr_' . md5($data . time()) . '.png';
     }
     
-    // Générer le QR code
     QRcode::png($data, $filename, QR_ECLEVEL_L, 10, 2);
     
     return $filename;
@@ -706,5 +850,26 @@ function getModuleQRCodeUrl($module_id) {
         return $qr_file;
     }
     return null;
+}
+
+/**
+ * Fonction pour obtenir les détails complets d'un module avec emplacement
+ */
+function getModuleWithLocation($module_id, $db) {
+    $query = "SELECT 
+                m.*,
+                l.name as location_name,
+                l.address,
+                l.city,
+                l.province,
+                l.postal_code
+              FROM modules m
+              LEFT JOIN module_locations ml ON m.id = ml.module_id AND ml.status = 'active'
+              LEFT JOIN locations l ON ml.location_id = l.id
+              WHERE m.module_id = ?";
+    
+    $stmt = $db->prepare($query);
+    $stmt->execute([$module_id]);
+    return $stmt->fetch(PDO::FETCH_ASSOC);
 }
 ?>
