@@ -167,6 +167,9 @@ $total_donors = $stmt->fetch(PDO::FETCH_ASSOC);
                                     <button type="submit" class="btn btn-primary">
                                         <i class="fas fa-qrcode"></i> Générer le Code QR du Module
                                     </button>
+                                    <a href="generate_all_qr_codes.php" class="btn btn-outline-primary ms-2">
+                                        <i class="fas fa-external-link-alt"></i> Ouvrir le Générateur Avancé
+                                    </a>
                                 </form>
                             </div>
                         </div>
@@ -192,9 +195,9 @@ $total_donors = $stmt->fetch(PDO::FETCH_ASSOC);
                                 <button id="printQR" class="btn btn-success w-100" disabled onclick="printModuleQRCode()">
                                     <i class="fas fa-print"></i> Imprimer le Code QR du Module
                                 </button>
-                                <a href="generate_all_qr_codes.php" class="btn btn-outline-primary mt-2 w-100">
-                                    <i class="fas fa-qrcode"></i> Générateur Avancé de Codes QR
-                                </a>
+                                <button id="downloadQR" class="btn btn-primary mt-2 w-100" disabled onclick="downloadQRCode()">
+                                    <i class="fas fa-download"></i> Télécharger le QR Code
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -211,97 +214,210 @@ document.getElementById('moduleForm').addEventListener('submit', function(e) {
     
     // Collecter toutes les données du formulaire
     const moduleData = {
-        module_id: document.getElementById('moduleId').value,
-        module_name: document.getElementById('moduleName').value,
-        mac_address: document.getElementById('macAddress').value,
-        location_name: document.getElementById('locationName').value,
-        address: document.getElementById('address').value,
-        city: document.getElementById('city').value,
-        province: document.getElementById('province').value,
-        postal_code: document.getElementById('postalCode').value
+        module_id: document.getElementById('moduleId').value.trim(),
+        module_name: document.getElementById('moduleName').value.trim(),
+        mac_address: document.getElementById('macAddress').value.trim(),
+        location_name: document.getElementById('locationName').value.trim(),
+        address: document.getElementById('address').value.trim(),
+        city: document.getElementById('city').value.trim(),
+        province: document.getElementById('province').value.trim(),
+        postal_code: document.getElementById('postalCode').value.trim()
     };
     
     // Valider les champs requis
-    if (!moduleData.module_id.trim() || !moduleData.module_name.trim() || !moduleData.location_name.trim()) {
+    if (!moduleData.module_id || !moduleData.module_name || !moduleData.location_name) {
         alert('Veuillez remplir tous les champs obligatoires (ID du Module, Nom du Module, Nom du Lieu)');
         return;
     }
     
     // Afficher le chargement
-    document.getElementById('qrPreview').innerHTML = '<p>Génération du code QR du module...</p>';
+    document.getElementById('qrPreview').innerHTML = `
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Chargement...</span>
+            </div>
+            <p class="mt-2">Génération du code QR du module...</p>
+        </div>
+    `;
     document.getElementById('moduleInfo').style.display = 'none';
     document.getElementById('qrDataPreview').style.display = 'none';
+    document.getElementById('printQR').disabled = true;
+    document.getElementById('downloadQR').disabled = true;
     
-    // Envoyer les données pour générer le code QR
+    // Create FormData for submission
     const formData = new FormData();
-    formData.append('data', JSON.stringify(moduleData));
-    formData.append('type', 'QRCODE');
+    formData.append('module_id', moduleData.module_id);
+    formData.append('module_name', moduleData.module_name);
+    formData.append('mac_address', moduleData.mac_address);
+    formData.append('location_name', moduleData.location_name);
+    formData.append('address', moduleData.address);
+    formData.append('city', moduleData.city);
+    formData.append('province', moduleData.province);
+    formData.append('postal_code', moduleData.postal_code);
+    formData.append('generate_single', '1');
     
-    fetch('generate_barcode.php', {
+    // Send to generate_all_qr_codes.php
+    fetch('generate_all_qr_codes.php', {
         method: 'POST',
         body: formData
     })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Afficher le code QR
-            document.getElementById('qrPreview').innerHTML = data.html;
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`Erreur HTTP: ${response.status}`);
+        }
+        return response.text();
+    })
+    .then(html => {
+        // Parse the HTML response
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        
+        // Check for errors
+        const errorAlert = doc.querySelector('.alert-danger');
+        if (errorAlert) {
+            throw new Error(errorAlert.textContent.trim());
+        }
+        
+        // Look for success message
+        const successAlert = doc.querySelector('.alert-success');
+        const successMessage = successAlert ? successAlert.textContent.trim() : null;
+        
+        // Look for the QR code image in the preview section
+        const previewSection = doc.querySelector('#codePreview');
+        const qrImg = previewSection ? previewSection.querySelector('img') : null;
+        
+        // Build location string
+        let location = moduleData.location_name;
+        if (moduleData.address) location += ', ' + moduleData.address;
+        if (moduleData.city) location += ', ' + moduleData.city;
+        if (moduleData.province) location += ', ' + moduleData.province;
+        if (moduleData.postal_code) location += ' ' + moduleData.postal_code;
+        
+        if (qrImg && qrImg.src) {
+            // Display the QR code
+            displayQRCode(qrImg.src, moduleData, location, successMessage);
+        } else if (successMessage) {
+            // QR might already exist - try to display existing one
+            const existingQrPath = 'qr_codes/mdva_module_' + moduleData.module_id + '.png';
             
-            // Construire l'emplacement complet
-            let location = moduleData.location_name;
-            if (moduleData.address) location += ', ' + moduleData.address;
-            if (moduleData.city) location += ', ' + moduleData.city;
-            if (moduleData.province) location += ', ' + moduleData.province;
-            if (moduleData.postal_code) location += ' ' + moduleData.postal_code;
-            
-            // Afficher les détails du module
-            document.getElementById('moduleDetails').innerHTML = `
-                <strong>ID du Module :</strong> ${moduleData.module_id}<br>
-                <strong>Nom du Module :</strong> ${moduleData.module_name}<br>
-                <strong>Adresse MAC :</strong> ${moduleData.mac_address || 'Non spécifiée'}<br>
-                <strong>Emplacement :</strong> ${location}<br>
-                <strong>Système :</strong> MDVA Donation Module<br>
-                <strong>Type :</strong> Station de Don à Pièces
-            `;
-            document.getElementById('moduleInfo').style.display = 'block';
-            
-            // Afficher les données JSON qui seront scannées
-            const qrData = {
-                module_id: moduleData.module_id,
-                module_name: moduleData.module_name,
-                location: location,
-                system: "MDVA",
-                type: "donation_module",
-                version: "1.0",
-                timestamp: Math.floor(Date.now() / 1000),
-                url: "https://tech-ideapad.com/donate.php?module=" + encodeURIComponent(moduleData.module_id)
+            // Check if file exists by trying to load it
+            const testImg = new Image();
+            testImg.onload = function() {
+                displayQRCode(existingQrPath, moduleData, location, successMessage + ' (fichier existant)');
             };
-            
-            document.getElementById('qrDataContent').textContent = JSON.stringify(qrData, null, 2);
-            document.getElementById('qrDataPreview').style.display = 'block';
-            
-            // Activer le bouton d'impression
-            document.getElementById('printQR').disabled = false;
-            
-            // Stocker les données pour l'impression
-            window.currentModuleQR = {
-                url: data.barcode_url,
-                moduleData: moduleData,
-                qrData: qrData,
-                location: location
+            testImg.onerror = function() {
+                // File doesn't exist or can't be loaded
+                document.getElementById('qrPreview').innerHTML = `
+                    <div class="alert alert-success">
+                        ${successMessage}
+                    </div>
+                    <p>Le code QR a été généré avec succès.</p>
+                    <p>Redirection vers le générateur pour voir le résultat...</p>
+                `;
+                // Redirect to the full generator to see the result
+                setTimeout(() => {
+                    window.open('generate_all_qr_codes.php', '_blank');
+                }, 2000);
             };
+            testImg.src = existingQrPath + '?t=' + new Date().getTime();
         } else {
-            alert('Erreur : ' + data.message);
-            document.getElementById('qrPreview').innerHTML = '<p class="text-danger">Erreur : ' + data.message + '</p>';
+            // No QR found, check if we should redirect
+            document.getElementById('qrPreview').innerHTML = `
+                <div class="alert alert-warning">
+                    Génération terminée mais aperçu non disponible.
+                </div>
+                <p>Ouvrir le générateur complet pour voir le résultat...</p>
+                <button onclick="window.open('generate_all_qr_codes.php', '_blank')" class="btn btn-primary">
+                    Ouvrir le Générateur
+                </button>
+            `;
+            
+            // Still show module info
+            showModuleInfo(moduleData, location);
         }
     })
     .catch(error => {
         console.error('Erreur :', error);
-        alert('Erreur lors de la génération du code QR');
-        document.getElementById('qrPreview').innerHTML = '<p class="text-danger">Erreur réseau</p>';
+        document.getElementById('qrPreview').innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle"></i> Erreur : ${error.message}
+            </div>
+            <p>Essayez d'utiliser le <a href="generate_all_qr_codes.php" target="_blank" class="btn btn-sm btn-primary">générateur avancé</a> directement.</p>
+        `;
     });
 });
 
+// Function to display QR code
+function displayQRCode(qrSrc, moduleData, location, successMessage) {
+    // Clean the src - remove any ../ from the path
+    const cleanSrc = qrSrc.replace(/\.\.\//g, '');
+    
+    // Display the QR code
+    let previewHTML = `
+        <img src="${cleanSrc}" alt="QR Code Module MDVA" 
+             style="max-width: 200px; height: auto; border: 1px solid #ddd; padding: 10px; background: white;"
+             onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"200\" height=\"200\"><rect width=\"100%\" height=\"100%\" fill=\"#f8f9fa\"/><text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" fill=\"#6c757d\">QR Code</text></svg>'">
+        <p class="mt-2"><strong>${moduleData.module_id}</strong></p>
+    `;
+    
+    if (successMessage) {
+        previewHTML = `
+            <div class="alert alert-success">
+                ${successMessage}
+            </div>
+            ${previewHTML}
+        `;
+    }
+    
+    document.getElementById('qrPreview').innerHTML = previewHTML;
+    
+    // Show module info
+    showModuleInfo(moduleData, location);
+    
+    // Create QR data for display
+    const qrData = {
+        module_id: moduleData.module_id,
+        module_name: moduleData.module_name,
+        location: location,
+        system: "MDVA",
+        type: "donation_module",
+        version: "1.0",
+        timestamp: Math.floor(Date.now() / 1000),
+        url: "https://systeme-mdva.com/module/" + encodeURIComponent(moduleData.module_id)
+    };
+    
+    // Display QR data
+    document.getElementById('qrDataContent').textContent = JSON.stringify(qrData, null, 2);
+    document.getElementById('qrDataPreview').style.display = 'block';
+    
+    // Enable buttons
+    document.getElementById('printQR').disabled = false;
+    document.getElementById('downloadQR').disabled = false;
+    
+    // Store data for printing/downloading
+    window.currentModuleQR = {
+        url: cleanSrc,
+        moduleData: moduleData,
+        qrData: qrData,
+        location: location,
+        filename: 'mdva_module_' + moduleData.module_id + '.png'
+    };
+}
+
+// Function to show module info
+function showModuleInfo(moduleData, location) {
+    document.getElementById('moduleDetails').innerHTML = `
+        <strong>ID du Module :</strong> ${moduleData.module_id}<br>
+        <strong>Nom du Module :</strong> ${moduleData.module_name}<br>
+        <strong>Adresse MAC :</strong> ${moduleData.mac_address || 'Non spécifiée'}<br>
+        <strong>Emplacement :</strong> ${location}<br>
+        <strong>Système :</strong> MDVA Donation Module<br>
+        <strong>Type :</strong> Station de Don à Pièces
+    `;
+    document.getElementById('moduleInfo').style.display = 'block';
+}
+
+// Print QR code function
 function printModuleQRCode() {
     if (!window.currentModuleQR) {
         alert('Aucun code QR à imprimer');
@@ -323,84 +439,144 @@ function printModuleQRCode() {
                     margin: 0; 
                     padding: 20px; 
                     font-family: Arial, sans-serif;
+                    background: white;
                 }
                 .label-container {
-                    border: 2px solid #000;
-                    padding: 15px;
-                    max-width: 300px;
+                    border: 2px solid #2196F3;
+                    padding: 20px;
+                    max-width: 350px;
                     margin: 0 auto;
-                }
-                .qr-code {
-                    text-align: center;
-                    margin-bottom: 15px;
-                }
-                .qr-code img {
-                    max-width: 100%;
-                    height: auto;
-                }
-                .module-info {
-                    font-size: 12px;
-                    line-height: 1.4;
-                    margin-bottom: 10px;
-                }
-                .module-info strong {
-                    display: block;
-                    margin-top: 5px;
+                    border-radius: 10px;
+                    background: white;
                 }
                 .header {
                     text-align: center;
-                    border-bottom: 2px solid #333;
-                    padding-bottom: 10px;
-                    margin-bottom: 10px;
+                    margin-bottom: 20px;
+                    padding-bottom: 15px;
+                    border-bottom: 2px solid #2196F3;
                 }
-                .qr-data {
+                .header h2 {
+                    margin: 0;
+                    color: #2196F3;
+                    font-size: 24px;
+                }
+                .header p {
+                    margin: 5px 0 0 0;
+                    color: #666;
+                    font-size: 14px;
+                }
+                .qr-container {
+                    text-align: center;
+                    margin: 20px 0;
+                    padding: 15px;
+                    background: #f8f9fa;
+                    border-radius: 5px;
+                }
+                .qr-container img {
+                    max-width: 250px;
+                    height: auto;
+                    margin: 0 auto;
+                    display: block;
+                    border: 1px solid #ddd;
+                    background: white;
+                    padding: 10px;
+                }
+                .module-info {
+                    margin: 15px 0;
+                    padding: 15px;
+                    background: #f8f9fa;
+                    border-radius: 5px;
+                    font-size: 12px;
+                }
+                .module-info h4 {
+                    margin: 0 0 10px 0;
+                    color: #333;
+                    font-size: 14px;
+                }
+                .module-id {
+                    font-size: 16px;
+                    font-weight: bold;
+                    color: #2196F3;
+                    margin: 5px 0;
+                }
+                .instructions {
+                    margin-top: 20px;
+                    padding-top: 15px;
+                    border-top: 1px solid #eee;
+                    font-size: 11px;
+                    color: #666;
+                    text-align: center;
+                }
+                .footer {
+                    margin-top: 20px;
                     font-size: 10px;
-                    background: #f5f5f5;
-                    padding: 5px;
-                    border-radius: 3px;
-                    margin-top: 10px;
-                    word-break: break-all;
+                    color: #999;
+                    text-align: center;
+                    border-top: 1px solid #eee;
+                    padding-top: 10px;
                 }
                 @media print {
-                    body { margin: 0; padding: 10px; }
-                    .label-container { border: 1px solid #000; }
+                    body { 
+                        margin: 0; 
+                        padding: 0;
+                    }
+                    .label-container {
+                        border: 1px solid #000;
+                        max-width: 100%;
+                    }
+                    .no-print {
+                        display: none !important;
+                    }
                 }
             </style>
         </head>
         <body>
             <div class="label-container">
                 <div class="header">
-                    <h3 style="margin: 0; color: #2196F3;">MDVA</h3>
-                    <p style="margin: 0; font-size: 14px;">Module de Donation</p>
-                    <p style="margin: 0; font-size: 12px; color: #666;">Scanner avec l'App MDVA</p>
+                    <h2>MDVA</h2>
+                    <p>Système de Donation Modulaire ESP32</p>
                 </div>
                 
-                <div class="qr-code">
-                    <img src="${window.currentModuleQR.url}" alt="Code QR Module MDVA">
+                <div class="qr-container">
+                    <img src="${window.currentModuleQR.url}" alt="Code QR Module MDVA" 
+                         onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"250\" height=\"250\"><rect width=\"100%\" height=\"100%\" fill=\"#f8f9fa\"/><text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" fill=\"#6c757d\">QR Code</text></svg>'">
                 </div>
                 
                 <div class="module-info">
-                    <strong>Module ID :</strong> ${module.module_id}
-                    <strong>Nom :</strong> ${module.module_name}
-                    ${module.mac_address ? `<strong>MAC :</strong> ${module.mac_address}` : ''}
-                    <strong>Lieu :</strong> ${location}
+                    <h4>Module ESP32</h4>
+                    <div class="module-id">${module.module_id}</div>
+                    <p><strong>Nom:</strong> ${module.module_name}</p>
+                    ${module.mac_address ? `<p><strong>MAC:</strong> ${module.mac_address}</p>` : ''}
+                    <p><strong>Lieu:</strong> ${location}</p>
                 </div>
                 
-                <div class="qr-data">
-                    <strong>Données scannées :</strong><br>
-                    ${JSON.stringify(qrData)}
+                <div class="instructions">
+                    <p><strong>Instructions :</strong></p>
+                    <p>1. Scanner ce code QR avec l'application mobile MDVA</p>
+                    <p>2. Le module sera automatiquement reconnu</p>
+                    <p>3. Prêt à recevoir des dons</p>
                 </div>
                 
-                <div style="text-align: center; margin-top: 10px; font-size: 10px; color: #666;">
-                    Système MDVA • ${new Date().toLocaleDateString()}
+                <div class="footer">
+                    <p>Système MDVA - https://systeme-mdva.com</p>
+                    <p>Généré le ${new Date().toLocaleDateString('fr-CA')} à ${new Date().toLocaleTimeString('fr-CA', {hour: '2-digit', minute:'2-digit'})}</p>
+                </div>
+                
+                <div class="no-print" style="text-align: center; margin-top: 20px;">
+                    <button onclick="window.print();" style="padding: 10px 20px; background: #2196F3; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                        <i class="fas fa-print"></i> Imprimer
+                    </button>
+                    <button onclick="window.close();" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer; margin-left: 10px;">
+                        <i class="fas fa-times"></i> Fermer
+                    </button>
                 </div>
             </div>
             <script>
                 window.onload = function() {
-                    window.print();
+                    // Auto-print after 500ms
                     setTimeout(function() {
-                        window.close();
-                    }, 1000);
+                        window.print();
+                    }, 500);
                 };
             <\/script>
         </body>
@@ -409,15 +585,35 @@ function printModuleQRCode() {
     printWindow.document.close();
 }
 
-// Charger les modules existants depuis la base de données
+// Download QR code function
+function downloadQRCode() {
+    if (!window.currentModuleQR) {
+        alert('Aucun code QR à télécharger');
+        return;
+    }
+    
+    const link = document.createElement('a');
+    link.href = window.currentModuleQR.url;
+    link.download = window.currentModuleQR.filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// Load existing modules for auto-fill
 function loadExistingModules() {
     fetch('../api/modules.php?action=get_all')
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.success && data.modules && data.modules.length > 0) {
                 const modules = data.modules;
                 
-                // Créer une boîte de dialogue pour sélectionner un module
+                // Create a select dropdown for existing modules
                 const moduleList = modules.map(module => 
                     `<option value="${module.module_id}">${module.module_id} - ${module.name}</option>`
                 ).join('');
@@ -432,7 +628,7 @@ function loadExistingModules() {
                     </div>
                 `;
                 
-                // Insérer avant le formulaire
+                // Insert before the first form field
                 const form = document.getElementById('moduleForm');
                 const firstField = form.querySelector('.mb-3');
                 if (firstField) {
@@ -445,26 +641,27 @@ function loadExistingModules() {
         });
 }
 
-// Remplir le formulaire avec les données d'un module existant
+// Fill form with existing module data
 function fillModuleData(moduleId) {
     if (!moduleId) return;
     
-    fetch('../api/modules.php?action=status&module_id=' + moduleId)
+    fetch('../api/modules.php?action=status&module_id=' + encodeURIComponent(moduleId))
         .then(response => response.json())
         .then(data => {
             if (data.success && data.module) {
                 const module = data.module;
                 
-                // Remplir le formulaire
+                // Fill the form
                 document.getElementById('moduleId').value = module.module_id || '';
                 document.getElementById('moduleName').value = module.name || '';
                 document.getElementById('locationName').value = module.location_name || module.location || '';
                 
-                // Remplir les champs d'adresse si disponibles
+                // Fill address fields if available
                 if (module.address) document.getElementById('address').value = module.address;
                 if (module.city) document.getElementById('city').value = module.city;
                 if (module.province) document.getElementById('province').value = module.province;
                 if (module.postal_code) document.getElementById('postalCode').value = module.postal_code;
+                if (module.mac_address) document.getElementById('macAddress').value = module.mac_address;
             }
         })
         .catch(error => {
@@ -472,7 +669,7 @@ function fillModuleData(moduleId) {
         });
 }
 
-// Charger les modules existants au chargement de la page
+// Load existing modules when page loads
 window.addEventListener('DOMContentLoaded', loadExistingModules);
 </script>
 
