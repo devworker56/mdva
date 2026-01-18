@@ -295,7 +295,7 @@ function generateModuleQRData($module_id, $module_name = '', $location = '') {
  * Générer un code QR unique pour un module (ESP32 format)
  */
 function generateModuleQRCode($module_id, $module_name = '', $location = '', $save_path = null) {
-    require_once '../qrlib/phpqrcode/qrlib.php'; // CORRECTED PATH
+    require_once 'qrlib/phpqrcode/qrlib.php';
     
     $qr_data = generateModuleQRData($module_id, $module_name, $location);
     
@@ -316,7 +316,7 @@ function generateModuleQRCode($module_id, $module_name = '', $location = '', $sa
  * Générer plusieurs codes QR pour tous les modules (ESP32 format)
  */
 function generateAllModuleQRCodes($db) {
-    require_once '../qrlib/phpqrcode/qrlib.php'; // CORRECTED PATH
+    require_once 'qrlib/phpqrcode/qrlib.php';
     
     $qr_dir = "../qr_codes/";
     if (!file_exists($qr_dir)) {
@@ -502,7 +502,7 @@ function saveModuleToDatabaseAndGenerateQR($module_data, $db) {
         $qr_data_json = json_encode($qr_data);
         
         // Generate QR code
-        require_once '../qrlib/phpqrcode/qrlib.php'; // CORRECTED PATH
+        require_once 'qrlib/phpqrcode/qrlib.php';
         
         $qr_dir = "../qr_codes/";
         if (!file_exists($qr_dir)) {
@@ -818,7 +818,7 @@ function generate_tax_receipt_data_simple($donor_id, $year, $db) {
  * Fonction pour générer un QR code simple
  */
 function generateSimpleQRCode($data, $filename = null) {
-    require_once '../qrlib/phpqrcode/qrlib.php'; // CORRECTED PATH
+    require_once 'qrlib/phpqrcode/qrlib.php';
     
     if ($filename === null) {
         $temp_dir = "../temp_qr_codes/";
