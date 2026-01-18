@@ -269,112 +269,6 @@ function check_password_strength($password) {
     return $strength >= 4; // Au moins 4 critères sur 5
 }
 
-/**
- * Générer un token CSRF
- */
-function generate_csrf_token() {
-    if (!isset($_SESSION['csrf_token'])) {
-        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-    }
-    return $_SESSION['csrf_token'];
-}
-
-/**
- * Valider un token CSRF
- */
-function validate_csrf_token($token) {
-    if (!isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $token)) {
-        return false;
-    }
-    return true;
-}
-
-/**
- * Formater une date pour l'affichage
- */
-function format_date($date_string, $format = 'd/m/Y H:i') {
-    $date = new DateTime($date_string);
-    return $date->format($format);
-}
-
-/**
- * Calculer l'âge à partir d'une date de naissance
- */
-function calculate_age($birthdate) {
-    $birthdate = new DateTime($birthdate);
-    $today = new DateTime('today');
-    return $birthdate->diff($today)->y;
-}
-
-/**
- * Compresser une image
- */
-function compress_image($source_path, $destination_path, $quality = 75) {
-    $info = getimagesize($source_path);
-    
-    if ($info['mime'] == 'image/jpeg') {
-        $image = imagecreatefromjpeg($source_path);
-    } elseif ($info['mime'] == 'image/png') {
-        $image = imagecreatefrompng($source_path);
-    } elseif ($info['mime'] == 'image/gif') {
-        $image = imagecreatefromgif($source_path);
-    } else {
-        return false;
-    }
-    
-    if ($info['mime'] == 'image/jpeg') {
-        imagejpeg($image, $destination_path, $quality);
-    } elseif ($info['mime'] == 'image/png') {
-        imagepng($image, $destination_path, 9);
-    } elseif ($info['mime'] == 'image/gif') {
-        imagegif($image, $destination_path);
-    }
-    
-    imagedestroy($image);
-    return true;
-}
-
-/**
- * Valider un numéro de téléphone canadien
- */
-function validate_canadian_phone($phone) {
-    // Format: (123) 456-7890 ou 123-456-7890 ou 1234567890
-    $pattern = '/^(\+\d{1,2}\s)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}$/';
-    return preg_match($pattern, $phone);
-}
-
-/**
- * Valider un code postal canadien
- */
-function validate_canadian_postal_code($postal_code) {
-    // Format: A1A 1A1
-    $pattern = '/^[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d$/';
-    return preg_match($pattern, $postal_code);
-}
-
-/**
- * Obtenir la province par code
- */
-function get_province_name($code) {
-    $provinces = [
-        'QC' => 'Québec',
-        'ON' => 'Ontario',
-        'BC' => 'Colombie-Britannique',
-        'AB' => 'Alberta',
-        'MB' => 'Manitoba',
-        'SK' => 'Saskatchewan',
-        'NS' => 'Nouvelle-Écosse',
-        'NB' => 'Nouveau-Brunswick',
-        'NL' => 'Terre-Neuve-et-Labrador',
-        'PE' => 'Île-du-Prince-Édouard',
-        'NT' => 'Territoires du Nord-Ouest',
-        'YT' => 'Yukon',
-        'NU' => 'Nunavut'
-    ];
-    
-    return $provinces[strtoupper($code)] ?? $code;
-}
-
 // =============================================================================
 // FONCTIONS POUR LA GÉNÉRATION DE CODES QR ESP32
 // =============================================================================
@@ -401,7 +295,7 @@ function generateModuleQRData($module_id, $module_name = '', $location = '') {
  * Générer un code QR unique pour un module (ESP32 format)
  */
 function generateModuleQRCode($module_id, $module_name = '', $location = '', $save_path = null) {
-    require_once __DIR__ . '/../qrlib/phpqrcode/phpqrcode.php'; // CORRECTED PATH
+    require_once __DIR__ . '/../qrlib/phpqrcode/phpqrcode.php'; // FIXED PATH
     
     $qr_data = generateModuleQRData($module_id, $module_name, $location);
     
@@ -422,7 +316,7 @@ function generateModuleQRCode($module_id, $module_name = '', $location = '', $sa
  * Générer plusieurs codes QR pour tous les modules (ESP32 format)
  */
 function generateAllModuleQRCodes($db) {
-    require_once __DIR__ . '/../qrlib/phpqrcode/phpqrcode.php'; // CORRECTED PATH
+    require_once __DIR__ . '/../qrlib/phpqrcode/phpqrcode.php'; // FIXED PATH
     
     $qr_dir = "../qr_codes/";
     if (!file_exists($qr_dir)) {
@@ -608,7 +502,7 @@ function saveModuleToDatabaseAndGenerateQR($module_data, $db) {
         $qr_data_json = json_encode($qr_data);
         
         // Generate QR code
-        require_once __DIR__ . '/../qrlib/phpqrcode/phpqrcode.php'; // CORRECTED PATH
+        require_once __DIR__ . '/../qrlib/phpqrcode/phpqrcode.php'; // FIXED PATH
         
         $qr_dir = "../qr_codes/";
         if (!file_exists($qr_dir)) {
@@ -926,81 +820,6 @@ function generate_tax_receipt_data_simple($donor_id, $year, $db) {
     ];
 }
 
-/**
- * Exporter l'historique des transactions au format PDF
- */
-function export_transaction_history_pdf($donor_id, $year, $db) {
-    require_once __DIR__ . '/../vendor/autoload.php'; // Assurez-vous que TCPDF est installé
-    
-    $transactions = get_donor_verifiable_history($donor_id, $db, 100);
-    
-    if (empty($transactions)) {
-        return false;
-    }
-    
-    // Créer un PDF simple
-    $pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
-    $pdf->SetCreator('Système MDVA');
-    $pdf->SetAuthor('MDVA');
-    $pdf->SetTitle('Historique des Transactions');
-    $pdf->SetSubject('Transactions Vérifiables');
-    
-    $pdf->AddPage();
-    
-    // Titre
-    $pdf->SetFont('helvetica', 'B', 16);
-    $pdf->Cell(0, 10, 'Historique des Transactions Vérifiables', 0, 1, 'C');
-    $pdf->Ln(10);
-    
-    // Informations
-    $pdf->SetFont('helvetica', '', 10);
-    $pdf->Cell(0, 10, 'Donateur ID: ' . $donor_id, 0, 1);
-    $pdf->Cell(0, 10, 'Année: ' . $year, 0, 1);
-    $pdf->Cell(0, 10, 'Date de génération: ' . date('Y-m-d H:i:s'), 0, 1);
-    $pdf->Ln(5);
-    
-    // Tableau des transactions
-    $pdf->SetFont('helvetica', 'B', 10);
-    $pdf->Cell(40, 10, 'Date/Heure', 1, 0, 'C');
-    $pdf->Cell(30, 10, 'Type', 1, 0, 'C');
-    $pdf->Cell(100, 10, 'Données', 1, 1, 'C');
-    
-    $pdf->SetFont('helvetica', '', 8);
-    foreach ($transactions as $transaction) {
-        $pdf->Cell(40, 10, $transaction['timestamp'], 1, 0);
-        $pdf->Cell(30, 10, $transaction['transaction_type'], 1, 0);
-        
-        $data = json_decode($transaction['transaction_data'], true);
-        $summary = '';
-        if (isset($data['action'])) {
-            $summary = $data['action'];
-            if (isset($data['amount'])) {
-                $summary .= ' - ' . $data['amount'] . '$';
-            }
-            if (isset($data['charity_name'])) {
-                $summary .= ' - ' . $data['charity_name'];
-            }
-        }
-        
-        $pdf->Cell(100, 10, substr($summary, 0, 40), 1, 1);
-    }
-    
-    $pdf->Ln(10);
-    $pdf->SetFont('helvetica', 'I', 8);
-    $pdf->Cell(0, 10, 'Document généré automatiquement par le Système MDVA - Toutes les transactions sont cryptographiquement vérifiables', 0, 1, 'C');
-    
-    $filename = 'transaction_history_' . $donor_id . '_' . $year . '.pdf';
-    $filepath = '../exports/' . $filename;
-    
-    if (!file_exists('../exports/')) {
-        mkdir('../exports/', 0755, true);
-    }
-    
-    $pdf->Output($filepath, 'F');
-    
-    return $filepath;
-}
-
 // =============================================================================
 // FONCTIONS AJOUTÉES POUR LA GÉNÉRATION DE CODES QR
 // =============================================================================
@@ -1009,7 +828,7 @@ function export_transaction_history_pdf($donor_id, $year, $db) {
  * Fonction pour générer un QR code simple
  */
 function generateSimpleQRCode($data, $filename = null) {
-    require_once __DIR__ . '/../qrlib/phpqrcode/phpqrcode.php'; // CORRECTED PATH
+    require_once __DIR__ . '/../qrlib/phpqrcode/phpqrcode.php'; // FIXED PATH
     
     if ($filename === null) {
         $temp_dir = "../temp_qr_codes/";
@@ -1029,7 +848,7 @@ function generateSimpleQRCode($data, $filename = null) {
  */
 function moduleQRCodeExists($module_id) {
     $qr_file = "../qr_codes/mdva_module_" . $module_id . ".png";
-    return file_exists($qr_file);
+    return file_exists($qr_file) && filesize($qr_file) > 0;
 }
 
 /**
@@ -1037,7 +856,7 @@ function moduleQRCodeExists($module_id) {
  */
 function getModuleQRCodeUrl($module_id) {
     $qr_file = "qr_codes/mdva_module_" . $module_id . ".png";
-    if (file_exists("../" . $qr_file)) {
+    if (file_exists("../" . $qr_file) && filesize("../" . $qr_file) > 0) {
         return $qr_file;
     }
     return null;
@@ -1068,12 +887,16 @@ function getModuleWithLocation($module_id, $db) {
  * Fonction pour générer un code-barres (non-QR)
  */
 function generateBarcode($data, $type = 'C128', $width = 2, $height = 30) {
-    require_once __DIR__ . '/../vendor/autoload.php'; // Si vous utilisez une librairie de codes-barres
+    // Note: Si vous avez une librairie de codes-barres, incluez-la ici
+    // require_once __DIR__ . '/../vendor/autoload.php';
     
     try {
-        // Exemple avec la librairie TCPDF (si installée)
-        $barcode = TCPDFBarcode::getBarcodeHTML($data, $type, $width, $height);
-        return $barcode;
+        // Exemple avec TCPDF si installé
+        if (class_exists('TCPDF')) {
+            $barcode = TCPDFBarcode::getBarcodeHTML($data, $type, $width, $height);
+            return $barcode;
+        }
+        return '<div class="barcode-error">Code-barres non disponible - installez TCPDF</div>';
     } catch (Exception $e) {
         error_log("Erreur génération code-barres: " . $e->getMessage());
         return '<div class="barcode-error">Code-barres non disponible</div>';
