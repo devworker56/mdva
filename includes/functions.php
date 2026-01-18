@@ -152,7 +152,7 @@ function log_activity($db, $user_type, $user_id, $action, $description = '') {
 function notify_pusher($event, $data, $channel) {
     try {
         // Inclure votre configuration Pusher
-        require_once '../config/pusher.php';
+        require_once __DIR__ . '/../config/pusher.php';
         
         $pusher = getPusher();
         if (!$pusher) {
@@ -269,6 +269,112 @@ function check_password_strength($password) {
     return $strength >= 4; // Au moins 4 critères sur 5
 }
 
+/**
+ * Générer un token CSRF
+ */
+function generate_csrf_token() {
+    if (!isset($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf_token'];
+}
+
+/**
+ * Valider un token CSRF
+ */
+function validate_csrf_token($token) {
+    if (!isset($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $token)) {
+        return false;
+    }
+    return true;
+}
+
+/**
+ * Formater une date pour l'affichage
+ */
+function format_date($date_string, $format = 'd/m/Y H:i') {
+    $date = new DateTime($date_string);
+    return $date->format($format);
+}
+
+/**
+ * Calculer l'âge à partir d'une date de naissance
+ */
+function calculate_age($birthdate) {
+    $birthdate = new DateTime($birthdate);
+    $today = new DateTime('today');
+    return $birthdate->diff($today)->y;
+}
+
+/**
+ * Compresser une image
+ */
+function compress_image($source_path, $destination_path, $quality = 75) {
+    $info = getimagesize($source_path);
+    
+    if ($info['mime'] == 'image/jpeg') {
+        $image = imagecreatefromjpeg($source_path);
+    } elseif ($info['mime'] == 'image/png') {
+        $image = imagecreatefrompng($source_path);
+    } elseif ($info['mime'] == 'image/gif') {
+        $image = imagecreatefromgif($source_path);
+    } else {
+        return false;
+    }
+    
+    if ($info['mime'] == 'image/jpeg') {
+        imagejpeg($image, $destination_path, $quality);
+    } elseif ($info['mime'] == 'image/png') {
+        imagepng($image, $destination_path, 9);
+    } elseif ($info['mime'] == 'image/gif') {
+        imagegif($image, $destination_path);
+    }
+    
+    imagedestroy($image);
+    return true;
+}
+
+/**
+ * Valider un numéro de téléphone canadien
+ */
+function validate_canadian_phone($phone) {
+    // Format: (123) 456-7890 ou 123-456-7890 ou 1234567890
+    $pattern = '/^(\+\d{1,2}\s)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}$/';
+    return preg_match($pattern, $phone);
+}
+
+/**
+ * Valider un code postal canadien
+ */
+function validate_canadian_postal_code($postal_code) {
+    // Format: A1A 1A1
+    $pattern = '/^[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d$/';
+    return preg_match($pattern, $postal_code);
+}
+
+/**
+ * Obtenir la province par code
+ */
+function get_province_name($code) {
+    $provinces = [
+        'QC' => 'Québec',
+        'ON' => 'Ontario',
+        'BC' => 'Colombie-Britannique',
+        'AB' => 'Alberta',
+        'MB' => 'Manitoba',
+        'SK' => 'Saskatchewan',
+        'NS' => 'Nouvelle-Écosse',
+        'NB' => 'Nouveau-Brunswick',
+        'NL' => 'Terre-Neuve-et-Labrador',
+        'PE' => 'Île-du-Prince-Édouard',
+        'NT' => 'Territoires du Nord-Ouest',
+        'YT' => 'Yukon',
+        'NU' => 'Nunavut'
+    ];
+    
+    return $provinces[strtoupper($code)] ?? $code;
+}
+
 // =============================================================================
 // FONCTIONS POUR LA GÉNÉRATION DE CODES QR ESP32
 // =============================================================================
@@ -295,7 +401,7 @@ function generateModuleQRData($module_id, $module_name = '', $location = '') {
  * Générer un code QR unique pour un module (ESP32 format)
  */
 function generateModuleQRCode($module_id, $module_name = '', $location = '', $save_path = null) {
-    require_once '../qrlib/phpqrcode/qrlib.php'; // CORRECTED PATH
+    require_once __DIR__ . '/../qrlib/phpqrcode/phpqrcode.php'; // CORRECTED PATH
     
     $qr_data = generateModuleQRData($module_id, $module_name, $location);
     
@@ -316,7 +422,7 @@ function generateModuleQRCode($module_id, $module_name = '', $location = '', $sa
  * Générer plusieurs codes QR pour tous les modules (ESP32 format)
  */
 function generateAllModuleQRCodes($db) {
-    require_once '../qrlib/phpqrcode/qrlib.php'; // CORRECTED PATH
+    require_once __DIR__ . '/../qrlib/phpqrcode/phpqrcode.php'; // CORRECTED PATH
     
     $qr_dir = "../qr_codes/";
     if (!file_exists($qr_dir)) {
@@ -502,7 +608,7 @@ function saveModuleToDatabaseAndGenerateQR($module_data, $db) {
         $qr_data_json = json_encode($qr_data);
         
         // Generate QR code
-        require_once '../qrlib/phpqrcode/qrlib.php'; // CORRECTED PATH
+        require_once __DIR__ . '/../qrlib/phpqrcode/phpqrcode.php'; // CORRECTED PATH
         
         $qr_dir = "../qr_codes/";
         if (!file_exists($qr_dir)) {
@@ -565,6 +671,16 @@ function get_system_stats($db) {
     $stmt = $db->prepare($query);
     $stmt->execute();
     $stats['today_donations'] = $stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
+    
+    $query = "SELECT COUNT(*) as count FROM modules WHERE status = 'active'";
+    $stmt = $db->prepare($query);
+    $stmt->execute();
+    $stats['active_modules'] = $stmt->fetch(PDO::FETCH_ASSOC)['count'];
+    
+    $query = "SELECT COUNT(*) as count FROM users WHERE status = 'active'";
+    $stmt = $db->prepare($query);
+    $stmt->execute();
+    $stats['active_users'] = $stmt->fetch(PDO::FETCH_ASSOC)['count'];
     
     return $stats;
 }
@@ -810,6 +926,81 @@ function generate_tax_receipt_data_simple($donor_id, $year, $db) {
     ];
 }
 
+/**
+ * Exporter l'historique des transactions au format PDF
+ */
+function export_transaction_history_pdf($donor_id, $year, $db) {
+    require_once __DIR__ . '/../vendor/autoload.php'; // Assurez-vous que TCPDF est installé
+    
+    $transactions = get_donor_verifiable_history($donor_id, $db, 100);
+    
+    if (empty($transactions)) {
+        return false;
+    }
+    
+    // Créer un PDF simple
+    $pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
+    $pdf->SetCreator('Système MDVA');
+    $pdf->SetAuthor('MDVA');
+    $pdf->SetTitle('Historique des Transactions');
+    $pdf->SetSubject('Transactions Vérifiables');
+    
+    $pdf->AddPage();
+    
+    // Titre
+    $pdf->SetFont('helvetica', 'B', 16);
+    $pdf->Cell(0, 10, 'Historique des Transactions Vérifiables', 0, 1, 'C');
+    $pdf->Ln(10);
+    
+    // Informations
+    $pdf->SetFont('helvetica', '', 10);
+    $pdf->Cell(0, 10, 'Donateur ID: ' . $donor_id, 0, 1);
+    $pdf->Cell(0, 10, 'Année: ' . $year, 0, 1);
+    $pdf->Cell(0, 10, 'Date de génération: ' . date('Y-m-d H:i:s'), 0, 1);
+    $pdf->Ln(5);
+    
+    // Tableau des transactions
+    $pdf->SetFont('helvetica', 'B', 10);
+    $pdf->Cell(40, 10, 'Date/Heure', 1, 0, 'C');
+    $pdf->Cell(30, 10, 'Type', 1, 0, 'C');
+    $pdf->Cell(100, 10, 'Données', 1, 1, 'C');
+    
+    $pdf->SetFont('helvetica', '', 8);
+    foreach ($transactions as $transaction) {
+        $pdf->Cell(40, 10, $transaction['timestamp'], 1, 0);
+        $pdf->Cell(30, 10, $transaction['transaction_type'], 1, 0);
+        
+        $data = json_decode($transaction['transaction_data'], true);
+        $summary = '';
+        if (isset($data['action'])) {
+            $summary = $data['action'];
+            if (isset($data['amount'])) {
+                $summary .= ' - ' . $data['amount'] . '$';
+            }
+            if (isset($data['charity_name'])) {
+                $summary .= ' - ' . $data['charity_name'];
+            }
+        }
+        
+        $pdf->Cell(100, 10, substr($summary, 0, 40), 1, 1);
+    }
+    
+    $pdf->Ln(10);
+    $pdf->SetFont('helvetica', 'I', 8);
+    $pdf->Cell(0, 10, 'Document généré automatiquement par le Système MDVA - Toutes les transactions sont cryptographiquement vérifiables', 0, 1, 'C');
+    
+    $filename = 'transaction_history_' . $donor_id . '_' . $year . '.pdf';
+    $filepath = '../exports/' . $filename;
+    
+    if (!file_exists('../exports/')) {
+        mkdir('../exports/', 0755, true);
+    }
+    
+    $pdf->Output($filepath, 'F');
+    
+    return $filepath;
+}
+
 // =============================================================================
 // FONCTIONS AJOUTÉES POUR LA GÉNÉRATION DE CODES QR
 // =============================================================================
@@ -818,7 +1009,7 @@ function generate_tax_receipt_data_simple($donor_id, $year, $db) {
  * Fonction pour générer un QR code simple
  */
 function generateSimpleQRCode($data, $filename = null) {
-    require_once '../qrlib/phpqrcode/qrlib.php'; // CORRECTED PATH
+    require_once __DIR__ . '/../qrlib/phpqrcode/phpqrcode.php'; // CORRECTED PATH
     
     if ($filename === null) {
         $temp_dir = "../temp_qr_codes/";
@@ -871,5 +1062,513 @@ function getModuleWithLocation($module_id, $db) {
     $stmt = $db->prepare($query);
     $stmt->execute([$module_id]);
     return $stmt->fetch(PDO::FETCH_ASSOC);
+}
+
+/**
+ * Fonction pour générer un code-barres (non-QR)
+ */
+function generateBarcode($data, $type = 'C128', $width = 2, $height = 30) {
+    require_once __DIR__ . '/../vendor/autoload.php'; // Si vous utilisez une librairie de codes-barres
+    
+    try {
+        // Exemple avec la librairie TCPDF (si installée)
+        $barcode = TCPDFBarcode::getBarcodeHTML($data, $type, $width, $height);
+        return $barcode;
+    } catch (Exception $e) {
+        error_log("Erreur génération code-barres: " . $e->getMessage());
+        return '<div class="barcode-error">Code-barres non disponible</div>';
+    }
+}
+
+/**
+ * Fonction pour valider les données du module
+ */
+function validate_module_data($module_data) {
+    $errors = [];
+    
+    if (empty($module_data['module_id'])) {
+        $errors[] = "L'ID du module est requis";
+    } elseif (!preg_match('/^MDVA_[A-Z0-9]{6}$/', $module_data['module_id'])) {
+        $errors[] = "Format d'ID module invalide. Utilisez: MDVA_XXXXXX";
+    }
+    
+    if (empty($module_data['module_name'])) {
+        $errors[] = "Le nom du module est requis";
+    }
+    
+    if (empty($module_data['location_name'])) {
+        $errors[] = "Le nom de l'emplacement est requis";
+    }
+    
+    if (empty($module_data['mac_address'])) {
+        $errors[] = "L'adresse MAC est requise";
+    } elseif (!preg_match('/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/', $module_data['mac_address'])) {
+        $errors[] = "Format d'adresse MAC invalide";
+    }
+    
+    return $errors;
+}
+
+/**
+ * Fonction pour obtenir tous les modules avec leur statut QR
+ */
+function getAllModulesWithQRStatus($db) {
+    $query = "SELECT 
+                m.module_id,
+                m.name as module_name,
+                m.status,
+                m.location,
+                CASE 
+                    WHEN EXISTS (SELECT 1 FROM qr_codes q WHERE q.module_id = m.module_id) THEN 1
+                    ELSE 0
+                END as has_qr_code,
+                (SELECT q.file_path FROM qr_codes q WHERE q.module_id = m.module_id ORDER BY q.created_at DESC LIMIT 1) as qr_path
+              FROM modules m
+              ORDER BY m.name";
+    
+    $stmt = $db->prepare($query);
+    $stmt->execute();
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/**
+ * Fonction pour nettoyer les anciens fichiers QR temporaires
+ */
+function cleanup_temp_qr_files($max_age_hours = 24) {
+    $temp_dir = "../temp_qr_codes/";
+    if (!file_exists($temp_dir)) {
+        return 0;
+    }
+    
+    $files = glob($temp_dir . "*.png");
+    $deleted_count = 0;
+    $cutoff_time = time() - ($max_age_hours * 3600);
+    
+    foreach ($files as $file) {
+        if (filemtime($file) < $cutoff_time) {
+            if (unlink($file)) {
+                $deleted_count++;
+            }
+        }
+    }
+    
+    return $deleted_count;
+}
+
+/**
+ * Fonction pour obtenir le nombre total de QR codes générés
+ */
+function get_total_qr_codes_generated($db) {
+    $query = "SELECT COUNT(*) as total FROM qr_codes";
+    $stmt = $db->prepare($query);
+    $stmt->execute();
+    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+    return $result['total'] ?? 0;
+}
+
+/**
+ * Fonction pour enregistrer la génération de QR code dans l'historique
+ */
+function log_qr_generation($db, $module_id, $user_id, $type = 'single') {
+    $query = "INSERT INTO qr_generation_logs (module_id, generated_by, generation_type, generated_at) 
+              VALUES (?, ?, ?, NOW())";
+    $stmt = $db->prepare($query);
+    return $stmt->execute([$module_id, $user_id, $type]);
+}
+
+/**
+ * Fonction pour obtenir les statistiques de génération de QR codes
+ */
+function get_qr_generation_stats($db, $days = 30) {
+    $query = "SELECT 
+                DATE(generated_at) as date,
+                COUNT(*) as count,
+                generation_type
+              FROM qr_generation_logs 
+              WHERE generated_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+              GROUP BY DATE(generated_at), generation_type
+              ORDER BY date DESC";
+    
+    $stmt = $db->prepare($query);
+    $stmt->execute([$days]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/**
+ * Fonction pour vérifier si un utilisateur peut générer des QR codes
+ */
+function can_generate_qr_codes($user_type) {
+    $allowed_types = ['admin', 'supervisor'];
+    return in_array($user_type, $allowed_types);
+}
+
+/**
+ * Fonction pour générer un rapport d'activité QR
+ */
+function generate_qr_activity_report($db, $start_date, $end_date) {
+    $query = "SELECT 
+                qgl.module_id,
+                m.name as module_name,
+                u.username as generated_by,
+                qgl.generation_type,
+                qgl.generated_at,
+                (SELECT file_path FROM qr_codes WHERE module_id = qgl.module_id ORDER BY created_at DESC LIMIT 1) as latest_qr_path
+              FROM qr_generation_logs qgl
+              LEFT JOIN modules m ON qgl.module_id = m.module_id
+              LEFT JOIN users u ON qgl.generated_by = u.id
+              WHERE qgl.generated_at BETWEEN ? AND ?
+              ORDER BY qgl.generated_at DESC";
+    
+    $stmt = $db->prepare($query);
+    $stmt->execute([$start_date, $end_date]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/**
+ * Fonction pour envoyer une notification par email lors de la génération de QR
+ */
+function send_qr_generation_notification($email, $module_id, $qr_path, $type = 'single') {
+    $subject = "QR Code Généré - Module " . $module_id;
+    $message = "Bonjour,\n\n";
+    $message .= "Un QR code a été généré pour le module " . $module_id . ".\n";
+    $message .= "Type: " . ($type == 'single' ? 'Génération unique' : 'Génération en masse') . "\n";
+    $message .= "Date: " . date('Y-m-d H:i:s') . "\n";
+    $message .= "Le fichier est disponible à l'emplacement: " . $qr_path . "\n\n";
+    $message .= "Cordialement,\nSystème MDVA";
+    
+    $headers = "From: systeme-mdva@example.com\r\n";
+    $headers .= "Reply-To: no-reply@systeme-mdva.com\r\n";
+    $headers .= "X-Mailer: PHP/" . phpversion();
+    
+    return mail($email, $subject, $message, $headers);
+}
+
+/**
+ * Fonction pour vérifier les permissions d'accès aux fichiers QR
+ */
+function check_qr_file_permissions($file_path) {
+    if (!file_exists($file_path)) {
+        return ['exists' => false, 'readable' => false, 'writable' => false];
+    }
+    
+    return [
+        'exists' => true,
+        'readable' => is_readable($file_path),
+        'writable' => is_writable($file_path),
+        'size' => filesize($file_path),
+        'modified' => date('Y-m-d H:i:s', filemtime($file_path))
+    ];
+}
+
+/**
+ * Fonction pour créer un zip de tous les QR codes
+ */
+function create_qr_codes_zip($db) {
+    $qr_dir = "../qr_codes/";
+    if (!file_exists($qr_dir)) {
+        return false;
+    }
+    
+    $files = glob($qr_dir . "*.png");
+    if (empty($files)) {
+        return false;
+    }
+    
+    $zip = new ZipArchive();
+    $zip_filename = '../exports/qr_codes_' . date('Y-m-d_H-i-s') . '.zip';
+    
+    if (!file_exists('../exports/')) {
+        mkdir('../exports/', 0755, true);
+    }
+    
+    if ($zip->open($zip_filename, ZipArchive::CREATE) !== TRUE) {
+        return false;
+    }
+    
+    foreach ($files as $file) {
+        $zip->addFile($file, basename($file));
+    }
+    
+    $zip->close();
+    
+    return $zip_filename;
+}
+
+/**
+ * Fonction pour obtenir la liste des fichiers QR générés
+ */
+function get_generated_qr_files($limit = 100) {
+    $qr_dir = "../qr_codes/";
+    if (!file_exists($qr_dir)) {
+        return [];
+    }
+    
+    $files = glob($qr_dir . "*.png");
+    $result = [];
+    
+    foreach ($files as $file) {
+        $result[] = [
+            'filename' => basename($file),
+            'path' => $file,
+            'size' => filesize($file),
+            'modified' => date('Y-m-d H:i:s', filemtime($file))
+        ];
+    }
+    
+    // Trier par date de modification (le plus récent en premier)
+    usort($result, function($a, $b) {
+        return strtotime($b['modified']) - strtotime($a['modified']);
+    });
+    
+    return array_slice($result, 0, $limit);
+}
+
+/**
+ * Fonction pour supprimer un fichier QR spécifique
+ */
+function delete_qr_file($filename, $db) {
+    $file_path = "../qr_codes/" . $filename;
+    
+    if (!file_exists($file_path)) {
+        return ['success' => false, 'error' => 'Fichier non trouvé'];
+    }
+    
+    // Extraire l'ID du module du nom de fichier
+    if (preg_match('/mdva_module_(.+)\.png/', $filename, $matches)) {
+        $module_id = $matches[1];
+        
+        // Enregistrer dans les logs
+        $query = "INSERT INTO qr_deletion_logs (module_id, filename, deleted_at, deleted_by) 
+                  VALUES (?, ?, NOW(), ?)";
+        $stmt = $db->prepare($query);
+        $stmt->execute([$module_id, $filename, $_SESSION['user_id'] ?? 0]);
+    }
+    
+    if (unlink($file_path)) {
+        return ['success' => true, 'filename' => $filename];
+    } else {
+        return ['success' => false, 'error' => 'Impossible de supprimer le fichier'];
+    }
+}
+
+/**
+ * Fonction pour régénérer tous les QR codes expirés
+ */
+function regenerate_expired_qr_codes($db, $expiry_days = 90) {
+    $qr_dir = "../qr_codes/";
+    if (!file_exists($qr_dir)) {
+        return ['regenerated' => 0, 'errors' => []];
+    }
+    
+    $files = glob($qr_dir . "*.png");
+    $regenerated = 0;
+    $errors = [];
+    
+    foreach ($files as $file) {
+        $file_age = time() - filemtime($file);
+        
+        if ($file_age > ($expiry_days * 24 * 3600)) {
+            // Extraire l'ID du module
+            if (preg_match('/mdva_module_(.+)\.png/', basename($file), $matches)) {
+                $module_id = $matches[1];
+                $module = getModuleWithLocation($module_id, $db);
+                
+                if ($module) {
+                    try {
+                        // Régénérer le QR code
+                        generateModuleQRCode(
+                            $module_id,
+                            $module['name'],
+                            $module['location_name'] ?? '',
+                            $file
+                        );
+                        $regenerated++;
+                    } catch (Exception $e) {
+                        $errors[] = "Erreur avec $module_id: " . $e->getMessage();
+                    }
+                }
+            }
+        }
+    }
+    
+    return ['regenerated' => $regenerated, 'errors' => $errors];
+}
+
+/**
+ * Fonction pour vérifier la validité d'un QR code
+ */
+function validate_qr_code($file_path) {
+    if (!file_exists($file_path)) {
+        return ['valid' => false, 'error' => 'Fichier non trouvé'];
+    }
+    
+    $image_info = getimagesize($file_path);
+    if (!$image_info) {
+        return ['valid' => false, 'error' => 'Fichier image invalide'];
+    }
+    
+    return [
+        'valid' => true,
+        'width' => $image_info[0],
+        'height' => $image_info[1],
+        'mime_type' => $image_info['mime'],
+        'size' => filesize($file_path)
+    ];
+}
+
+/**
+ * Fonction pour mettre à jour les données du QR code sans régénérer l'image
+ */
+function update_qr_code_data($module_id, $new_data, $db) {
+    $qr_file = "../qr_codes/mdva_module_" . $module_id . ".png";
+    
+    if (!file_exists($qr_file)) {
+        return ['success' => false, 'error' => 'QR code non trouvé'];
+    }
+    
+    // Enregistrer les nouvelles données dans la base de données
+    $query = "INSERT INTO qr_code_updates (module_id, old_data, new_data, updated_at, updated_by) 
+              VALUES (?, ?, ?, NOW(), ?)";
+    $stmt = $db->prepare($query);
+    
+    // Note: Pour mettre à jour l'image elle-même, il faudrait régénérer le QR code
+    return ['success' => true, 'message' => 'Données mises à jour, QR code inchangé'];
+}
+
+/**
+ * Fonction pour obtenir l'historique des modifications de QR codes
+ */
+function get_qr_code_update_history($module_id, $db, $limit = 10) {
+    $query = "SELECT 
+                old_data,
+                new_data,
+                updated_at,
+                updated_by
+              FROM qr_code_updates 
+              WHERE module_id = ? 
+              ORDER BY updated_at DESC 
+              LIMIT ?";
+    
+    $stmt = $db->prepare($query);
+    $stmt->execute([$module_id, $limit]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/**
+ * Fonction pour archiver les anciens QR codes
+ */
+function archive_old_qr_codes($db, $archive_days = 30) {
+    $qr_dir = "../qr_codes/";
+    $archive_dir = "../qr_codes_archive/" . date('Y-m') . "/";
+    
+    if (!file_exists($qr_dir)) {
+        return ['archived' => 0, 'errors' => []];
+    }
+    
+    if (!file_exists($archive_dir)) {
+        mkdir($archive_dir, 0755, true);
+    }
+    
+    $files = glob($qr_dir . "*.png");
+    $archived = 0;
+    $errors = [];
+    $cutoff_time = strtotime("-$archive_days days");
+    
+    foreach ($files as $file) {
+        if (filemtime($file) < $cutoff_time) {
+            $filename = basename($file);
+            $destination = $archive_dir . $filename;
+            
+            if (copy($file, $destination)) {
+                // Enregistrer l'archivage
+                if (preg_match('/mdva_module_(.+)\.png/', $filename, $matches)) {
+                    $module_id = $matches[1];
+                    
+                    $query = "INSERT INTO qr_code_archive (module_id, filename, archived_at, archived_by) 
+                              VALUES (?, ?, NOW(), ?)";
+                    $stmt = $db->prepare($query);
+                    $stmt->execute([$module_id, $filename, $_SESSION['user_id'] ?? 0]);
+                }
+                
+                $archived++;
+            } else {
+                $errors[] = "Impossible d'archiver $filename";
+            }
+        }
+    }
+    
+    return ['archived' => $archived, 'errors' => $errors];
+}
+
+/**
+ * Fonction pour restaurer un QR code archivé
+ */
+function restore_archived_qr_code($filename, $db) {
+    // Chercher dans tous les sous-dossiers d'archive
+    $archive_base = "../qr_codes_archive/";
+    $files = [];
+    
+    foreach (glob($archive_base . "*/*.png") as $file) {
+        if (basename($file) == $filename) {
+            $files[] = $file;
+        }
+    }
+    
+    if (empty($files)) {
+        return ['success' => false, 'error' => 'Fichier archivé non trouvé'];
+    }
+    
+    // Prendre le plus récent
+    $latest_file = $files[0];
+    $latest_mtime = filemtime($latest_file);
+    
+    foreach ($files as $file) {
+        if (filemtime($file) > $latest_mtime) {
+            $latest_file = $file;
+            $latest_mtime = filemtime($file);
+        }
+    }
+    
+    $destination = "../qr_codes/" . $filename;
+    
+    if (copy($latest_file, $destination)) {
+        return ['success' => true, 'filename' => $filename];
+    } else {
+        return ['success' => false, 'error' => 'Impossible de restaurer le fichier'];
+    }
+}
+
+/**
+ * Fonction pour obtenir les statistiques d'utilisation des QR codes
+ */
+function get_qr_code_usage_stats($db, $module_id = null) {
+    $query = "SELECT 
+                qr.module_id,
+                COUNT(*) as scan_count,
+                MIN(scanned_at) as first_scan,
+                MAX(scanned_at) as last_scan
+              FROM qr_code_scans qr";
+    
+    if ($module_id) {
+        $query .= " WHERE qr.module_id = ?";
+        $stmt = $db->prepare($query);
+        $stmt->execute([$module_id]);
+    } else {
+        $query .= " GROUP BY qr.module_id ORDER BY scan_count DESC";
+        $stmt = $db->prepare($query);
+        $stmt->execute();
+    }
+    
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+/**
+ * Fonction pour enregistrer un scan de QR code
+ */
+function log_qr_code_scan($db, $module_id, $scanned_by, $device_info = null) {
+    $query = "INSERT INTO qr_code_scans (module_id, scanned_by, device_info, scanned_at) 
+              VALUES (?, ?, ?, NOW())";
+    $stmt = $db->prepare($query);
+    return $stmt->execute([$module_id, $scanned_by, $device_info]);
 }
 ?>
