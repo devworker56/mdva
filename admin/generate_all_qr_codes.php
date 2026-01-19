@@ -12,8 +12,8 @@ ini_set('display_errors', 1);
 require_once '../config/database.php';
 require_once '../includes/functions.php';
 
-// Include the QR code library - FIXED PATH
-require_once __DIR__ . '/../qrlib/phpqrcode/phpqrcode.php';
+// Include the QR code library - FIXED PATH (same as get_qr_as_base64.php)
+require_once __DIR__ . '/qrlib/phpqrcode/phpqrcode.php';
 
 $database = new Database();
 $db = $database->getConnection();
