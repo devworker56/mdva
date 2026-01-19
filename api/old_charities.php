@@ -90,18 +90,19 @@ try {
 
 /**
  * Get all approved charities for mobile app
- * FIXED: Now returns only fields that actually exist in database
+ * FIXED: Now returns only fields expected by mobile app
  */
 function getApprovedCharities($db) {
     try {
         error_log("API Called: getApprovedCharities for mobile app");
         
-        // FIXED: Query ONLY fields that exist in database
+        // FIXED: Query includes all fields expected by mobile app
         $query = "SELECT 
                     id, 
                     name, 
                     COALESCE(description, '') as description, 
                     COALESCE(website, '') as website,
+                    COALESCE(category, 'Non spécifié') as category,
                     COALESCE(logo_url, '') as logo_url
                   FROM charities 
                   WHERE approved = 1 
@@ -114,17 +115,15 @@ function getApprovedCharities($db) {
         
         error_log("Found " . count($charities) . " charities in database");
         
-        // Add a dummy category field for mobile app compatibility
+        // Ensure all expected fields are present
         foreach ($charities as &$charity) {
             // Set defaults for any missing fields
             $charity['id'] = intval($charity['id'] ?? 0);
             $charity['name'] = $charity['name'] ?? 'Organisme sans nom';
             $charity['description'] = $charity['description'] ?? 'Aucune description disponible.';
             $charity['website'] = $charity['website'] ?? '';
+            $charity['category'] = $charity['category'] ?? 'Non spécifié';
             $charity['logo_url'] = $charity['logo_url'] ?? '';
-            
-            // Add dummy category field since mobile app expects it
-            $charity['category'] = 'Non spécifié';
         }
         
         $response = [
@@ -175,6 +174,7 @@ function getAllCharities($db, $data) {
                 email,
                 website,
                 logo_url,
+                category,
                 address,
                 city,
                 province,
@@ -366,6 +366,7 @@ function getCharityDetail($db, $data) {
                 id, 
                 name, 
                 description, 
+                category,
                 email,
                 website,
                 logo_url,
@@ -636,9 +637,9 @@ function createCharity($db, $data) {
     // Prepare insert query
     $insert_query = "INSERT INTO charities 
                     (name, description, email, password, website, logo_url, 
-                     address, city, province, postal_code, phone, 
+                     category, address, city, province, postal_code, phone, 
                      contact_person, charity_number, approved, active) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     
     try {
         $stmt = $db->prepare($insert_query);
@@ -649,6 +650,7 @@ function createCharity($db, $data) {
             $hashed_password,
             $data['website'] ?? '',
             $data['logo_url'] ?? '',
+            $data['category'] ?? 'Non spécifié',
             $data['address'] ?? '',
             $data['city'] ?? '',
             $data['province'] ?? '',
@@ -717,7 +719,7 @@ function updateCharity($db, $data) {
     $update_values = [];
     
     $allowed_fields = [
-        'name', 'description', 'website', 'logo_url', 'address', 'city',
+        'name', 'description', 'website', 'logo_url', 'category', 'address', 'city',
         'province', 'postal_code', 'phone', 'contact_person', 'charity_number',
         'approved', 'active'
     ];
@@ -808,7 +810,8 @@ function searchCharities($db, $data) {
     }
     
     $search_like = "%" . $search_term . "%";
-    $where .= " AND (name LIKE ? OR description LIKE ?)";
+    $where .= " AND (name LIKE ? OR description LIKE ? OR category LIKE ?)";
+    $params[] = $search_like;
     $params[] = $search_like;
     $params[] = $search_like;
     
@@ -816,6 +819,7 @@ function searchCharities($db, $data) {
                 id, 
                 name, 
                 description, 
+                category,
                 website,
                 logo_url,
                 charity_number,
