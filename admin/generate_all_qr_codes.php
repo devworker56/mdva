@@ -12,8 +12,8 @@ ini_set('display_errors', 1);
 require_once '../config/database.php';
 require_once '../includes/functions.php';
 
-// Include the QR code library - FIXED PATH (same as get_qr_as_base64.php)
-require_once __DIR__ . '/qrlib/phpqrcode/phpqrcode.php';
+// Include the QR code library - CORRECTED PATH
+require_once __DIR__ . '/../qrlib/phpqrcode/phpqrcode.php';
 
 $database = new Database();
 $db = $database->getConnection();
@@ -68,9 +68,8 @@ if (isset($_POST['generate_single'])) {
                 $preview_data = $module_id;
                 $qr_data_preview = $qr_data;
                 
-                // CHANGEMENT CRITIQUE 2 : Calculer le chemin web CORRECTEMENT
-                // Comme test_qr_browser.php : str_replace(__DIR__ . '/', '', $test_file)
-                $preview_web_path = str_replace(__DIR__ . '/../', '', $qr_path);
+                // SIMPLE PATH - Just use the web-accessible path
+                $preview_web_path = 'qr_codes/mdva_module_' . $module['module_id'] . '.png';
             } else {
                 $error_message = "Le fichier QR n'a pas été créé : " . htmlspecialchars($qr_path);
             }
@@ -96,7 +95,7 @@ if (isset($_POST['generate_single'])) {
             $preview_file = $qr_file;
             $preview_data = $barcode_data;
             $qr_data_preview = ['custom_data' => $barcode_data];
-            $preview_web_path = str_replace(__DIR__ . '/../', '', $qr_file);
+            $preview_web_path = 'custom_qr_codes/' . basename($qr_file);
         } else {
             $error_message = "Échec de la génération du QR personnalisé";
         }
@@ -205,12 +204,12 @@ include '../includes/header.php';
                         $file_exists = file_exists($preview_file);
                         $file_size = $file_exists ? filesize($preview_file) : 0;
                         
-                        // CHANGEMENT CRITIQUE 3 : Utiliser le bon chemin web
+                        // SIMPLE PATH APPROACH
                         if (isset($preview_web_path)) {
                             $web_path = $preview_web_path;
                         } else {
-                            // Fallback : méthode originale
-                            $web_path = str_replace('../', '', $preview_file);
+                            // Fallback : simple method
+                            $web_path = 'qr_codes/' . basename($preview_file);
                         }
                         
                         // AJOUTER UN TIMESTAMP pour éviter le cache (comme test_qr_browser.php)
@@ -223,7 +222,7 @@ include '../includes/header.php';
                             $file_info = @getimagesize($preview_file);
                             $file_size_kb = round($file_size / 1024, 2);
                         ?>
-                            <!-- CHANGEMENT CRITIQUE 4 : Utiliser $img_src avec timestamp -->
+                            <!-- UTILISER LE CHEMIN SIMPLE -->
                             <img src="<?php echo htmlspecialchars($img_src); ?>" 
                                  alt="QR Code" 
                                  style="max-width: 200px; height: auto; border: 1px solid #ddd; padding: 10px; background: white;"
@@ -256,13 +255,13 @@ include '../includes/header.php';
                     
                     <div class="d-grid gap-2">
                         <?php if($file_exists && $file_size > 0): ?>
-                            <!-- CHANGEMENT CRITIQUE 5 : Utiliser $web_path pour le téléchargement -->
+                            <!-- UTILISER LE CHEMIN SIMPLE -->
                             <a href="<?php echo htmlspecialchars($web_path); ?>" 
                                download="mdva_qrcode_<?php echo htmlspecialchars($preview_data); ?>.png" 
                                class="btn btn-success">
                                 <i class="fas fa-download"></i> Télécharger ce QR Code
                             </a>
-                            <!-- CHANGEMENT CRITIQUE 6 : Utiliser $web_path pour l'impression -->
+                            <!-- UTILISER LE CHEMIN SIMPLE -->
                             <button onclick="printQRCode('<?php echo htmlspecialchars($web_path); ?>', '<?php echo htmlspecialchars($preview_data); ?>')" class="btn btn-outline-primary">
                                 <i class="fas fa-print"></i> Imprimer ce Code
                             </button>
@@ -373,9 +372,10 @@ include '../includes/header.php';
                             </thead>
                             <tbody>
                                 <?php foreach($modules as $module): 
-                                    // CHANGEMENT : Utiliser __DIR__ pour vérifier l'existence
-                                    $qr_file = __DIR__ . '/../qr_codes/mdva_module_' . $module['module_id'] . '.png';
-                                    $has_qr = file_exists($qr_file) && filesize($qr_file) > 0;
+                                    // SIMPLE PATH CHECK
+                                    $qr_file_path = 'qr_codes/mdva_module_' . $module['module_id'] . '.png';
+                                    $has_qr = file_exists(__DIR__ . '/../qr_codes/mdva_module_' . $module['module_id'] . '.png') && 
+                                              filesize(__DIR__ . '/../qr_codes/mdva_module_' . $module['module_id'] . '.png') > 0;
                                 ?>
                                 <tr>
                                     <td><?php echo htmlspecialchars($module['module_id']); ?></td>

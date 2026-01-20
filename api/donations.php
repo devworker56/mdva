@@ -1,5 +1,19 @@
 <?php
 header('Content-Type: application/json');
+
+// ==================== ENHANCED CORS HEADERS ====================
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Origin, X-Requested-With, Content-Type, Accept, Authorization, X-API-Key');
+header('Access-Control-Allow-Credentials: true');
+header('Access-Control-Max-Age: 86400'); // 24 hours
+
+// Handle preflight OPTIONS request
+if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
+
 require_once '../config/database.php';
 require_once '../includes/functions.php';
 
@@ -18,17 +32,6 @@ if ($method == 'POST') {
     }
 } else {
     $input = $_GET;
-}
-
-// Enable CORS for React Native app
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
-
-// Handle OPTIONS pre-flight request
-if ($method == 'OPTIONS') {
-    http_response_code(200);
-    exit();
 }
 
 try {
