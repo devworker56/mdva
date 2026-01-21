@@ -34,8 +34,6 @@
             <div class="col-md-6">
                 <h5>
                     <span class="footer-icon-container">
-                        <i class="fas fa-shield footer-shield-icon"></i>
-                        <i class="fas fa-hand-holding-heart footer-heart-icon"></i>
                     </span> MDVA
                 </h5>
                 <p>Écosystème de Micro-Dons Vérifiés et Attribués</p>
