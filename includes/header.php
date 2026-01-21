@@ -73,7 +73,7 @@ session_start();
                 </span> MDVA
             </a>-->
             <a class="navbar-brand" href="index.php">
-            <img src="images/favicon.png" alt="Logo MDVA" class="navbar-logo">MDVA
+            <img src="images/favicon.png" alt="Logo MDVA" class="navbar-logo">Écosystème de Micro-Dons Vérifiés et Attribués
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>

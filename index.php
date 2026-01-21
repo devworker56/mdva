@@ -17,60 +17,60 @@ $partners = [
         'type' => 'Boulangerie artisanale',
         'location' => 'Vieux-Québec',
         'module_active_since' => 'Janvier 2024',
-        'community_impact' => '25,000+ $ collectés à cet emplacement',
+        'community_impact' => '25,000+ $ collectés',
         'customer_footprint' => 'Lieu historique très fréquenté',
-        'image' => 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=400&q=80',
-        'testimonial' => 'Nous sommes fiers d\'offrir à nos clients une façon simple de faire la différence pendant leurs achats quotidiens.'
+        'image' => 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=400&h=250&q=80',
+        'testimonial' => 'Fiers d\'offrir à nos clients une façon simple de faire la différence.'
     ],
     [
         'name' => 'Café du Village',
         'type' => 'Café de quartier',
         'location' => 'Plateau Mont-Royal',
         'module_active_since' => 'Février 2024',
-        'community_impact' => '18,000+ $ collectés à cet emplacement',
+        'community_impact' => '18,000+ $ collectés',
         'customer_footprint' => 'Point de rencontre communautaire',
-        'image' => 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=400&q=80',
-        'testimonial' => 'Nos clients adorent pouvoir transformer leur monnaie en impact social positif.'
+        'image' => 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=400&h=250&q=80',
+        'testimonial' => 'Nos clients adorent transformer leur monnaie en impact social.'
     ],
     [
         'name' => 'Librairie Papyrus',
         'type' => 'Librairie indépendante',
         'location' => 'Mile-End',
         'module_active_since' => 'Janvier 2024',
-        'community_impact' => '31,000+ $ collectés à cet emplacement',
+        'community_impact' => '31,000+ $ collectés',
         'customer_footprint' => 'Public engagé et conscient',
-        'image' => 'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=400&q=80',
-        'testimonial' => 'Le module MDVA s\'intègre parfaitement dans notre mission de soutien à la communauté.'
+        'image' => 'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=400&h=250&q=80',
+        'testimonial' => 'S\'intègre parfaitement dans notre mission communautaire.'
     ],
     [
         'name' => 'Épicerie Verte Bio',
         'type' => 'Épicerie biologique',
         'location' => 'Rosemont',
         'module_active_since' => 'Mars 2024',
-        'community_impact' => '28,000+ $ collectés à cet emplacement',
+        'community_impact' => '28,000+ $ collectés',
         'customer_footprint' => 'Clients sensibles à l\'impact social',
-        'image' => 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=400&q=80',
-        'testimonial' => 'Nos valeurs écoresponsables vont de pair avec la mission de MDVA.'
+        'image' => 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=400&h=250&q=80',
+        'testimonial' => 'Nos valeurs écoresponsables vont de pair avec MDVA.'
     ],
     [
         'name' => 'Pharmacie Santé Plus',
         'type' => 'Pharmacie communautaire',
         'location' => 'Westmount',
         'module_active_since' => 'Février 2024',
-        'community_impact' => '42,000+ $ collectés à cet emplacement',
+        'community_impact' => '42,000+ $ collectés',
         'customer_footprint' => 'Trafic régulier et fidèle',
-        'image' => 'https://images.unsplash.com/photo-1587854692152-cbe660dbde88?auto=format&fit=crop&w=400&q=80',
-        'testimonial' => 'Un service essentiel qui permet à nos patients de contribuer facilement.'
+        'image' => 'https://images.unsplash.com/photo-1587854692152-cbe660dbde88?auto=format&fit=crop&w=400&h=250&q=80',
+        'testimonial' => 'Permet à nos patients de contribuer facilement.'
     ],
     [
         'name' => 'Restaurant Le Terroir',
         'type' => 'Restaurant gastronomique',
         'location' => 'Vieux-Port',
         'module_active_since' => 'Mars 2024',
-        'community_impact' => '37,000+ $ collectés à cet emplacement',
+        'community_impact' => '37,000+ $ collectés',
         'customer_footprint' => 'Touristes et résidents aisés',
-        'image' => 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=400&q=80',
-        'testimonial' => 'Nos clients apprécient de terminer leur expérience culinaire par un geste généreux.'
+        'image' => 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=400&h=250&q=80',
+        'testimonial' => 'Terminer par un geste généreux plaît à nos clients.'
     ]
 ];
 
@@ -81,158 +81,181 @@ $partnerChunks = array_chunk($partners, 3);
 <style>
     /* Custom Styling for the Business Section */
     .business-section {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
+        background: #f8f9fa;
         position: relative;
-        overflow: hidden;
-    }
-    .business-section::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 100"><path fill="rgba(255,255,255,0.03)" d="M0,50 C150,100 350,0 500,50 S850,0 1000,50 L1000,100 L0,100 Z"></path></svg>');
-        background-size: cover;
+        border-top: 1px solid #dee2e6;
+        border-bottom: 1px solid #dee2e6;
     }
     .partner-card {
         transition: all 0.3s ease;
         border: none;
         overflow: hidden;
-        border-radius: 15px;
+        border-radius: 10px;
         background: white;
         color: #333;
         height: 100%;
+        border: 1px solid #e9ecef;
+        font-size: 1rem; /* Taille de base standard */
     }
     .partner-card:hover {
-        transform: translateY(-10px) scale(1.02);
-        box-shadow: 0 20px 40px rgba(0,0,0,0.15) !important;
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.08) !important;
     }
     .host-badge {
         position: absolute;
-        top: 15px;
-        right: 15px;
-        background: linear-gradient(135deg, #667eea, #764ba2);
+        top: 12px;
+        right: 12px;
+        background: linear-gradient(135deg, #0d6efd, #0b5ed7);
         color: white;
-        padding: 8px 15px;
-        border-radius: 25px;
-        font-size: 0.8rem;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem; /* Légèrement agrandi */
         font-weight: 600;
         z-index: 10;
-        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        box-shadow: 0 2px 5px rgba(13, 110, 253, 0.3);
     }
     .partner-type {
-        color: #764ba2;
-        font-weight: 600;
-        font-size: 0.9rem;
-        margin-bottom: 5px;
+        color: #6c757d;
+        font-weight: 500;
+        font-size: 0.9rem; /* Légèrement agrandi */
+        margin-bottom: 6px;
     }
     .impact-stat {
-        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        background: linear-gradient(135deg, #0d6efd 0%, #198754 100%);
         color: white;
-        padding: 15px;
-        border-radius: 10px;
-        margin: 15px 0;
+        padding: 12px;
+        border-radius: 8px;
+        margin: 12px 0;
         text-align: center;
     }
     .impact-stat .number {
-        font-size: 1.8rem;
-        font-weight: 800;
+        font-size: 1.5rem; /* Légèrement agrandi */
+        font-weight: 700;
         display: block;
-        margin-bottom: 5px;
+        margin-bottom: 3px;
     }
     .impact-stat .label {
-        font-size: 0.85rem;
+        font-size: 0.85rem; /* Légèrement agrandi */
         opacity: 0.9;
     }
     .location-info {
         display: flex;
         align-items: center;
-        gap: 8px;
-        color: #666;
-        font-size: 0.9rem;
-        margin-bottom: 10px;
+        gap: 6px;
+        color: #6c757d;
+        font-size: 0.9rem; /* Légèrement agrandi */
+        margin-bottom: 8px;
+        line-height: 1.4;
     }
     .testimonial {
         font-style: italic;
         color: #555;
-        font-size: 0.9rem;
-        padding: 15px;
+        font-size: 0.9rem; /* Légèrement agrandi */
+        padding: 12px;
         background: #f8f9fa;
-        border-radius: 10px;
-        margin-top: 15px;
-        border-left: 4px solid #667eea;
+        border-radius: 8px;
+        margin-top: 12px;
+        border-left: 3px solid #0d6efd;
+        line-height: 1.5;
     }
     .carousel-control-prev, .carousel-control-next {
-        width: 50px;
-        height: 50px;
-        background: rgba(255,255,255,0.2);
+        width: 40px;
+        height: 40px;
+        background: rgba(13, 110, 253, 0.1);
         border-radius: 50%;
         top: 50%;
         transform: translateY(-50%);
-        backdrop-filter: blur(10px);
+        border: 1px solid rgba(13, 110, 253, 0.2);
+    }
+    .carousel-control-prev:hover, .carousel-control-next:hover {
+        background: rgba(13, 110, 253, 0.2);
     }
     .carousel-indicators [data-bs-target] {
-        background-color: white;
-        width: 12px;
-        height: 12px;
+        background-color: #0d6efd;
+        width: 10px;
+        height: 10px;
         border-radius: 50%;
-        margin: 0 5px;
-        opacity: 0.5;
+        margin: 0 4px;
+        opacity: 0.3;
     }
     .carousel-indicators .active {
         opacity: 1;
     }
     .thank-you-title {
-        font-size: 2.5rem;
-        font-weight: 800;
-        margin-bottom: 20px;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        font-size: 2.2rem; /* Légèrement agrandi */
+        font-weight: 700;
+        margin-bottom: 15px;
+        color: #212529;
     }
     .section-subtitle {
-        font-size: 1.2rem;
-        opacity: 0.9;
+        font-size: 1.1rem; /* Légèrement agrandi */
+        color: #6c757d;
         max-width: 700px;
-        margin: 0 auto 50px;
+        margin: 0 auto 40px;
+        line-height: 1.6;
     }
-    .module-icon-container {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 60px;
-        height: 60px;
-        background: white;
-        border-radius: 50%;
-        margin-bottom: 20px;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    .carousel-indicators {
+        bottom: -40px;
     }
-    .module-icon {
-        font-size: 2rem;
-        background: linear-gradient(135deg, #667eea, #764ba2);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+    .partner-card img {
+        height: 180px;
+        object-fit: cover;
+        width: 100%;
+    }
+    
+    /* Amélioration de la lisibilité globale */
+    body {
+        font-size: 1rem;
+        line-height: 1.6;
+    }
+    
+    .card-body {
+        font-size: 1rem;
+    }
+    
+    .card-title {
+        font-size: 1.1rem; /* Taille standard pour les titres de cartes */
+        line-height: 1.3;
+    }
+    
+    .small {
+        font-size: 0.9rem; /* Plus lisible que 0.85rem */
+    }
+    
+    .btn-sm {
+        font-size: 0.9rem;
+        padding: 0.375rem 0.75rem;
+    }
+    
+    /* Amélioration des titres de section */
+    .display-5 {
+        font-size: 2.5rem; /* Un peu plus grand */
+    }
+    
+    .lead {
+        font-size: 1.25rem; /* Standard pour lead */
+        line-height: 1.6;
     }
 </style>
 
 <div class="hero-section text-center">
     <div class="container">
-        <h1 class="display-4 fw-bold">Faites une Différence avec les Micro-Dons</h1>
+        <h1 class="display-5 fw-bold">Faites une Différence avec les Micro-Dons</h1>
         <p class="lead">MDVA transforme votre monnaie en dons vérifiables. Nous consolidons vos dons annuels en un seul reçu fiscal, vous permettant de réclamer votre crédit, tout en garantissant que les organismes reçoivent un soutien fiable et entièrement attribué.</p>
     </div>
 </div>
 
 <div class="container my-5">
-    <h2 class="text-center mb-4 section-title">Nos Organismes de Bienfaisance Vérifiés</h2>
+    <h2 class="text-center mb-4">Nos Organismes de Bienfaisance Vérifiés</h2>
     <div class="row" id="charities-container">
         <?php foreach($charities as $charity): ?>
         <div class="col-md-4 mb-4">
             <div class="card charity-card h-100 shadow-sm">
                 <div class="card-body">
-                    <h5 class="card-title"><?php echo htmlspecialchars($charity['name']); ?></h5>
+                    <h5 class="card-title fw-bold"><?php echo htmlspecialchars($charity['name']); ?></h5>
                     <p class="card-text"><?php echo htmlspecialchars($charity['description']); ?></p>
                     <?php if($charity['website']): ?>
-                    <a href="<?php echo htmlspecialchars($charity['website']); ?>" class="btn btn-outline-primary" target="_blank">
+                    <a href="<?php echo htmlspecialchars($charity['website']); ?>" class="btn btn-outline-primary btn-sm" target="_blank">
                         Visiter le Site Web
                     </a>
                     <?php endif; ?>
@@ -244,62 +267,63 @@ $partnerChunks = array_chunk($partners, 3);
 </div>
 
 <!-- Section des Partenaires Hôtes -->
-<div class="business-section py-5">
-    <div class="container position-relative">
+<div class="business-section py-5"> <!-- Retour à py-5 pour un meilleur espacement -->
+    <div class="container">
         <div class="text-center mb-5">
-            <div class="module-icon-container mx-auto">
-                <i class="bi bi-shop-window module-icon"></i>
-            </div>
             <h2 class="thank-you-title">Nos Hôtes Engagés</h2>
-            <p class="section-subtitle">Un merci spécial à ces commerces qui hébergent nos modules MDVA, permettant à des milliers de donateurs de transformer leur monnaie en impact social.</p>
+            <p class="section-subtitle">
+                Merci à ces commerces qui hébergent nos modules MDVA, permettant aux donateurs de transformer leur monnaie en impact social.
+            </p>
         </div>
 
-        <div id="partnerCarousel" class="carousel slide" data-bs-ride="carousel" data-bs-interval="6000">
-            <div class="carousel-indicators" style="bottom: -60px;">
+        <div id="partnerCarousel" class="carousel slide" data-bs-ride="carousel" data-bs-interval="5000">
+            <div class="carousel-indicators">
                 <?php foreach($partnerChunks as $index => $chunk): ?>
-                <button type="button" data-bs-target="#partnerCarousel" data-bs-slide-to="<?php echo $index; ?>" class="<?php echo $index === 0 ? 'active' : ''; ?>"></button>
+                <button type="button" data-bs-target="#partnerCarousel" data-bs-slide-to="<?php echo $index; ?>" 
+                        class="<?php echo $index === 0 ? 'active' : ''; ?>"
+                        aria-label="Slide <?php echo $index + 1; ?>"></button>
                 <?php endforeach; ?>
             </div>
 
             <div class="carousel-inner">
                 <?php foreach($partnerChunks as $index => $chunk): ?>
                 <div class="carousel-item <?php echo $index === 0 ? 'active' : ''; ?>">
-                    <div class="row g-4">
+                    <div class="row g-4"> <!-- Retour à g-4 pour un meilleur espacement -->
                         <?php foreach($chunk as $partner): ?>
                         <div class="col-md-4">
-                            <div class="card partner-card h-100 shadow-lg">
+                            <div class="card partner-card h-100">
                                 <span class="host-badge">
-                                    <i class="bi bi-house-heart-fill me-1"></i> Hôte MDVA
+                                    <i class="bi bi-house-heart me-1"></i> Hôte MDVA
                                 </span>
-                                <img src="<?php echo $partner['image']; ?>" class="card-img-top" alt="<?php echo $partner['name']; ?>" style="height: 200px; object-fit: cover;">
+                                <img src="<?php echo $partner['image']; ?>" class="card-img-top" alt="<?php echo $partner['name']; ?>">
                                 <div class="card-body">
                                     <div class="partner-type">
-                                        <i class="bi bi-tag-fill me-1"></i> <?php echo $partner['type']; ?>
+                                        <i class="bi bi-tag me-1"></i> <?php echo $partner['type']; ?>
                                     </div>
-                                    <h5 class="card-title fw-bold mb-2"><?php echo $partner['name']; ?></h5>
+                                    <h5 class="card-title fw-bold mb-2"><?php echo $partner['name']; ?></h5> <!-- Retour à mb-2 -->
                                     
                                     <div class="location-info">
-                                        <i class="bi bi-geo-alt-fill text-primary"></i>
+                                        <i class="bi bi-geo-alt text-primary"></i>
                                         <?php echo $partner['location']; ?>
                                     </div>
                                     
                                     <div class="location-info">
-                                        <i class="bi bi-calendar-check-fill text-success"></i>
-                                        Module actif depuis <?php echo $partner['module_active_since']; ?>
+                                        <i class="bi bi-calendar-check text-success"></i>
+                                        Depuis <?php echo $partner['module_active_since']; ?>
                                     </div>
                                     
                                     <div class="impact-stat">
                                         <span class="number"><?php echo $partner['community_impact']; ?></span>
-                                        <span class="label">Impact total à cet emplacement</span>
+                                        <span class="label">Collecté à cet emplacement</span>
                                     </div>
                                     
                                     <div class="location-info">
-                                        <i class="bi bi-people-fill text-info"></i>
+                                        <i class="bi bi-people text-info"></i>
                                         <?php echo $partner['customer_footprint']; ?>
                                     </div>
                                     
                                     <div class="testimonial">
-                                        <i class="bi bi-chat-quote-fill me-2 text-primary"></i>
+                                        <i class="bi bi-quote me-1 text-muted"></i>
                                         "<?php echo $partner['testimonial']; ?>"
                                     </div>
                                 </div>
@@ -322,32 +346,31 @@ $partnerChunks = array_chunk($partners, 3);
         </div>
         
         <!-- CTA pour devenir hôte -->
-        <div class="text-center mt-5 pt-5">
+        <div class="text-center mt-5 pt-4">
             <div class="row justify-content-center">
                 <div class="col-lg-8">
-                    <div class="card border-0 shadow-lg" style="background: rgba(255,255,255,0.95);">
-                        <div class="card-body p-5">
-                            <h3 class="card-title mb-4">Devenez un Hôte MDVA</h3>
-                            <p class="card-text mb-4">
+                    <div class="card border shadow-sm">
+                        <div class="card-body p-4">
+                            <h4 class="card-title mb-3">Devenez un Hôte MDVA</h4>
+                            <p class="card-text mb-3">
                                 Rejoignez notre réseau de commerces engagés et offrez à vos clients la possibilité de faire la différence.
-                                En hébergeant un module MDVA, vous :
                             </p>
-                            <div class="row text-center">
-                                <div class="col-md-4 mb-3">
-                                    <i class="bi bi-emoji-heart-eyes display-6 text-primary mb-3"></i>
-                                    <h6>Renforcez l'engagement client</h6>
+                            <div class="row text-center mb-3">
+                                <div class="col-md-4 mb-2">
+                                    <i class="bi bi-emoji-heart-eyes h5 text-primary mb-2 d-block"></i>
+                                    <span>Engagement client</span>
                                 </div>
-                                <div class="col-md-4 mb-3">
-                                    <i class="bi bi-bullseye display-6 text-success mb-3"></i>
-                                    <h6>Ancrez votre commerce dans la communauté</h6>
+                                <div class="col-md-4 mb-2">
+                                    <i class="bi bi-bullseye h5 text-success mb-2 d-block"></i>
+                                    <span>Ancrage communautaire</span>
                                 </div>
-                                <div class="col-md-4 mb-3">
-                                    <i class="bi bi-trophy display-6 text-warning mb-3"></i>
-                                    <h6>Bénéficiez d'une visibilité positive</h6>
+                                <div class="col-md-4 mb-2">
+                                    <i class="bi bi-trophy h5 text-warning mb-2 d-block"></i>
+                                    <span>Visibilité positive</span>
                                 </div>
                             </div>
-                            <a href="#" class="btn btn-lg btn-primary mt-3 px-5">
-                                <i class="bi bi-envelope-fill me-2"></i> Devenir hôte
+                            <a href="#" class="btn btn-primary px-4">
+                                <i class="bi bi-envelope me-1"></i> Devenir hôte
                             </a>
                         </div>
                     </div>
@@ -373,7 +396,7 @@ document.addEventListener('DOMContentLoaded', function() {
     new bootstrap.Carousel(el, {
         pause: 'hover',
         wrap: true,
-        interval: 6000
+        interval: 5000
     });
 });
 </script>
